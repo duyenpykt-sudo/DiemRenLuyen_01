@@ -12,7 +12,9 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
-    "seed:excel": "tsx scripts/seed-excel.ts"
+    "seed:excel": "tsx scripts/seed-excel.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -38,6 +40,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.468.0",
     "next": "14.2.33",
     "next-auth": "5.0.0-beta.25",
@@ -45,9 +48,11 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.1",
+    "recharts": "^3.9.0",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
+    "xlsx": "^0.18.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
@@ -62,6 +67,7 @@
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.16",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.9"
   }
 }
