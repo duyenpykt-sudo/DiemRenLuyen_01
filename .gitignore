@@ -54,6 +54,9 @@ start-check.png
 *.swp
 *.swo
 
+# Claude Code (cấu hình/local settings của công cụ)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
