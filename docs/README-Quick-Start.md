@@ -43,7 +43,7 @@
 
 ## 🚀 Checklist trước khi mở Claude Code
 
-- [ ] Cài Node.js ≥ 20 trên máy.
+- [ ] Cài **Node.js 20 LTS** (chấp nhận 20–22). ⛔ **KHÔNG dùng Node 24** — gây lỗi 500 khi đăng nhập ở chế độ dev (xem mục ⚠️ Yêu cầu Node bên dưới).
 - [ ] Cài Git.
 - [ ] Tạo folder: `mkdir diem-renluyen && cd diem-renluyen && git init`.
 - [ ] Copy 3 file `.md` + file Excel mẫu `DC22CTT01-II-25-26.xls` vào folder.
@@ -75,6 +75,31 @@
 | 4 | **Phần A**: Export file Excel → so cell-by-cell với file mẫu, không lệch. **Phần B**: `IMPORT_EXCEL_ENABLED=false` → nút ẩn; chuyển `=true` + restart → nút hiện + import thành công. |
 | 5 | Tìm `221CTT006` ra trang SV; biểu đồ tiến triển 8 HK đúng. |
 | 6 | Tạo backup → xóa 1 SV → khôi phục → SV xuất hiện lại. Playwright pass. |
+
+---
+
+## ⚠️ Yêu cầu phiên bản Node (BẮT BUỘC)
+
+Dự án dùng **Next.js 14.2** → chỉ chạy ổn trên **Node 20–22 (LTS)**. **Node 24 không tương thích.**
+
+**Triệu chứng khi chạy sai Node (24+):**
+- Đăng nhập ở `npm run dev` báo lỗi **500** tại `/api/auth/providers`, console hiện:
+  `Jest worker encountered child process exceptions, exceeding retry limit`.
+- Bản production (`npm run serve`) vẫn chạy được vì đã compile sẵn lúc build.
+
+**Kiểm tra & khắc phục:**
+```powershell
+node -v                     # phải là v20.x (hoặc 22.x)
+```
+Nếu là v24 → chuyển về Node 20 bằng nvm-windows:
+```powershell
+# Cài nvm-windows (1 lần): winget install CoreyButler.NVMforWindows
+nvm install 20.18.1
+nvm use 20.18.1
+node -v                     # xác nhận v20.18.1
+```
+> Đã khóa sẵn trong repo: `engines` (package.json), `.nvmrc` (`20`), `.npmrc` (`engine-strict=true`)
+> → `npm install` sẽ **báo lỗi** nếu chạy sai phiên bản Node.
 
 ---
 
