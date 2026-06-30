@@ -13,8 +13,9 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "seed:excel": "tsx scripts/seed-excel.ts",
-    "build:standalone": "next build",
+    "build:standalone": "next build && node scripts/copy-standalone.mjs",
     "start:standalone": "node .next/standalone/server.js",
+    "serve": "npm run build:standalone && npm run start:standalone",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
