@@ -34,7 +34,15 @@ export const authConfig = {
         return true;
       }
 
-      return isLoggedIn;
+      if (!isLoggedIn) return false;
+
+      // Khu vực /admin chỉ dành cho ADMIN (mục 5.3 PRD + prompt Tuần 2).
+      const isOnAdmin = nextUrl.pathname.startsWith("/admin");
+      if (isOnAdmin && auth?.user?.role !== "ADMIN") {
+        return Response.redirect(new URL("/dashboard", nextUrl));
+      }
+
+      return true;
     },
     // Đưa thông tin nghiệp vụ vào JWT khi đăng nhập.
     jwt({ token, user }) {

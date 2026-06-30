@@ -6,11 +6,9 @@ export const { auth: middleware } = NextAuth(authConfig);
 
 export const config = {
   /**
-   * Áp dụng cho mọi route TRỪ:
-   * - /api/auth (next-auth nội bộ), /api/config (public feature flags)
+   * Áp dụng cho mọi PAGE route TRỪ:
+   * - /api/* (các API tự kiểm tra session + role qua lib/guard.ts)
    * - _next (asset Next.js), favicon, và các file tĩnh có đuôi.
    */
-  matcher: [
-    "/((?!api/auth|api/config|_next/static|_next/image|favicon.ico|.*\\.).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.).*)"],
 };
