@@ -40,6 +40,13 @@ coverage/
 .nyc_output/
 playwright-report/
 test-results/
+.playwright-mcp/
+
+# Ảnh screenshot chạy thử (Playwright MCP)
+login-new-ui.png
+serve-login-wide.png
+standalone-check.png
+start-check.png
 
 # IDE / Editor
 .vscode/
