@@ -25,6 +25,7 @@ export type ClassOption = {
   code: string;
   name: string;
   cohortId: string;
+  facultyId: string;
   faculty: { name: string };
 };
 

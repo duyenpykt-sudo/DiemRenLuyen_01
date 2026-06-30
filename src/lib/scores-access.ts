@@ -54,6 +54,7 @@ export async function getViewableClasses(session: Session) {
       code: true,
       name: true,
       cohortId: true,
+      facultyId: true,
       faculty: { select: { name: true } },
     },
   });

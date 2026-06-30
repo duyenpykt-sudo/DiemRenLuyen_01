@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { LogOut, Search, User as UserIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { Role } from "@/lib/enums";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -38,20 +41,45 @@ export function Topbar({
   fullName: string;
   role: Role;
 }) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  // Tra cứu nhanh: nhập MSSV/CCCD → Enter → mở trang chi tiết SV.
+  async function onSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    try {
+      const res = await fetch(`/api/students/lookup?q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      if (res.ok && json.data?.id) {
+        router.push(`/students/${json.data.id}`);
+      } else {
+        // Không khớp chính xác → chuyển sang trang tra cứu nâng cao.
+        router.push(`/search?q=${encodeURIComponent(q)}`);
+        toast.info("Không tìm thấy chính xác — mở tra cứu nâng cao.");
+      }
+    } catch {
+      toast.error("Lỗi tra cứu.");
+    }
+  }
+
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-2 h-6" />
 
-      {/* Thanh tìm kiếm global (chức năng tra cứu chi tiết ở Tuần 5) */}
-      <div className="relative hidden w-full max-w-sm md:block">
+      {/* Thanh tìm kiếm global theo MSSV/CCCD */}
+      <form onSubmit={onSearch} className="relative hidden w-full max-w-sm md:block">
         <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder="Tìm theo MSSV hoặc CCCD…"
           className="pl-8"
           aria-label="Tìm kiếm"
         />
-      </div>
+      </form>
 
       <div className="ml-auto flex items-center gap-1">
         <ThemeToggle />
