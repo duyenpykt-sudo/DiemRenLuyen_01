@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { LogOut, Search, User as UserIcon } from "lucide-react";
@@ -101,9 +102,11 @@ export function Topbar({
               </p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>
-              <UserIcon className="mr-2 h-4 w-4" />
-              Tài khoản
+            <DropdownMenuItem asChild>
+              <Link href="/account/password">
+                <UserIcon className="mr-2 h-4 w-4" />
+                Đổi mật khẩu
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => signOut({ callbackUrl: "/login" })}

@@ -251,12 +251,12 @@ cp backups/backup-20260629-1530.db prisma/dev.db
 
 | Tuần | Nội dung | Trạng thái |
 |---|---|---|
-| 1 | Init project + Auth + Feature flag | 🟡 Đang làm |
-| 2 | CRUD danh mục | ⚪ Chưa bắt đầu |
-| 3 | Nhập điểm (2 mode) + CLI seed + Audit log | ⚪ Chưa bắt đầu |
-| 4 | Export Excel + Import Excel | ⚪ Chưa bắt đầu |
-| 5 | Tra cứu + Thống kê + Biểu đồ | ⚪ Chưa bắt đầu |
-| 6 | Polish + Backup + Test E2E | ⚪ Chưa bắt đầu |
+| 1 | Init project + Auth + Feature flag | ✅ Hoàn thành |
+| 2 | CRUD danh mục | ✅ Hoàn thành |
+| 3 | Nhập điểm (2 mode) + CLI seed + Audit log | ✅ Hoàn thành |
+| 4 | Export Excel + Import Excel | ✅ Hoàn thành |
+| 5 | Tra cứu + Thống kê + Biểu đồ | ✅ Hoàn thành |
+| 6 | Polish + Backup + Phím tắt + Test E2E | ✅ Hoàn thành |
 
 Sau MVP có thể bổ sung: đóng gói `.exe` Windows, đa ngôn ngữ Anh-Việt, export PDF, gửi email báo cáo tự động, trang công khai cho SV tra cứu.
 
@@ -299,6 +299,15 @@ Dự án này được xây dựng bằng [Claude Code](https://docs.claude.com/
 
 **Hỏi: Dữ liệu lưu ở đâu?**  
 Đáp: 1 file SQLite duy nhất: `prisma/dev.db`. Copy file này là copy được toàn bộ DB.
+
+**Hỏi: Thêm CVHT mới như thế nào?**  
+Đáp: Đăng nhập Admin → **Quản lý danh mục > Người dùng** → **Thêm người dùng**, chọn vai trò **Cố vấn học tập**, đặt mật khẩu. Sau đó vào tab **Lớp**, gán CVHT đó làm cố vấn cho lớp tương ứng.
+
+**Hỏi: Phím tắt nào có sẵn?**  
+Đáp: `Ctrl+K` mở bảng lệnh (tìm SV nhanh + điều hướng); `Ctrl+S` ở tab "Bảng inline" của trang Điểm rèn luyện để lưu tất cả.
+
+**Hỏi: Người dùng tự đổi mật khẩu ở đâu?**  
+Đáp: Bấm vào tên ở góc phải trên → **Đổi mật khẩu** (cần nhập mật khẩu hiện tại).
 
 ---
 

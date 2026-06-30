@@ -122,6 +122,21 @@ export function ModeB({
     onChanged();
   }
 
+  // Ctrl+S (hoặc ⌘S) → lưu tất cả (mục phím tắt Tuần 6).
+  const saveAllRef = useRef(saveAll);
+  saveAllRef.current = saveAll;
+  useEffect(() => {
+    if (!editable) return;
+    const h = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void saveAllRef.current();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [editable]);
+
   return (
     <div className="space-y-3">
       {editable && (

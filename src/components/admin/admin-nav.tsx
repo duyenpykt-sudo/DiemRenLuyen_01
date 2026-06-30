@@ -11,6 +11,7 @@ const TABS = [
   { href: "/admin/classes", label: "Lớp" },
   { href: "/admin/students", label: "Sinh viên" },
   { href: "/admin/users", label: "Người dùng" },
+  { href: "/admin/backup", label: "Sao lưu" },
 ];
 
 export function AdminNav() {
