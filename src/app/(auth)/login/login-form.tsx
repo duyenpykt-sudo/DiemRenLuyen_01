@@ -60,14 +60,16 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader className="space-y-2 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
-          <GraduationCap className="h-6 w-6" />
+    <Card className="w-full max-w-sm border-border/60 shadow-lg shadow-primary/5">
+      <CardHeader className="space-y-3 text-center">
+        <div className="bg-gradient-brand mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg shadow-primary/30 lg:hidden">
+          <GraduationCap className="h-7 w-7" />
         </div>
-        <CardTitle className="text-xl">Quản lý Điểm Rèn luyện</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">
+          Chào mừng trở lại
+        </CardTitle>
         <CardDescription>
-          Khoa KHTN và CNTT — Trường Đại học Phú Yên
+          Đăng nhập để tiếp tục quản lý điểm rèn luyện
         </CardDescription>
       </CardHeader>
       <CardContent>

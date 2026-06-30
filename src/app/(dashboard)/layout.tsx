@@ -23,7 +23,7 @@ export default async function DashboardLayout({
       <AppSidebar role={role as Role} />
       <SidebarInset>
         <Topbar fullName={name ?? "Người dùng"} role={role as Role} />
-        <div className="flex-1 p-4 md:p-6">{children}</div>
+        <div className="flex-1 animate-fade-up p-4 md:p-6">{children}</div>
       </SidebarInset>
       <CommandPalette />
     </SidebarProvider>

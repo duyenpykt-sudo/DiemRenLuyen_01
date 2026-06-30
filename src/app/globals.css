@@ -4,64 +4,74 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Bảng màu Teal–Emerald — hiện đại, trẻ trung (sáng) */
+    --background: 168 44% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 174 80% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 168 30% 95%;
+    --secondary-foreground: 175 50% 20%;
+    --muted: 170 20% 95.5%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 166 60% 94%;
+    --accent-foreground: 174 70% 24%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --border: 168 25% 90%;
+    --input: 168 25% 88%;
+    --ring: 174 80% 34%;
+    --radius: 0.75rem;
+    --sidebar-background: 170 33% 99%;
+    --sidebar-foreground: 215 25% 30%;
+    --sidebar-primary: 174 80% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 166 60% 94%;
+    --sidebar-accent-foreground: 174 75% 24%;
+    --sidebar-border: 168 25% 90%;
+    --sidebar-ring: 174 80% 34%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Bảng màu Teal–Emerald — hiện đại, trẻ trung (tối) */
+    --background: 195 28% 8%;
+    --foreground: 170 15% 95%;
+    --card: 198 24% 11%;
+    --card-foreground: 170 15% 95%;
+    --popover: 198 24% 11%;
+    --popover-foreground: 170 15% 95%;
+    --primary: 162 72% 46%;
+    --primary-foreground: 185 40% 10%;
+    --secondary: 198 20% 17%;
+    --secondary-foreground: 170 15% 92%;
+    --muted: 198 20% 17%;
+    --muted-foreground: 190 12% 65%;
+    --accent: 174 50% 20%;
+    --accent-foreground: 162 70% 80%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 70% 45%;
+    --success-foreground: 185 40% 10%;
+    --warning: 38 90% 55%;
+    --warning-foreground: 185 40% 10%;
+    --border: 198 18% 20%;
+    --input: 198 18% 22%;
+    --ring: 162 72% 46%;
+    --sidebar-background: 198 26% 9%;
+    --sidebar-foreground: 180 10% 80%;
+    --sidebar-primary: 162 72% 46%;
+    --sidebar-primary-foreground: 185 40% 10%;
+    --sidebar-accent: 174 45% 18%;
+    --sidebar-accent-foreground: 162 70% 82%;
+    --sidebar-border: 198 18% 18%;
+    --sidebar-ring: 162 72% 46%;
   }
 }
 
@@ -71,5 +81,92 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Nền gradient mềm tạo chiều sâu — vệt teal/emerald rất nhạt ở 2 góc */
+    background-image:
+      radial-gradient(
+        60rem 40rem at 100% -10%,
+        hsl(var(--primary) / 0.07),
+        transparent 60%
+      ),
+      radial-gradient(
+        50rem 40rem at -10% 110%,
+        hsl(160 84% 39% / 0.06),
+        transparent 55%
+      );
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  /* Chữ gradient thương hiệu teal → emerald */
+  .text-gradient-brand {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      135deg,
+      hsl(174 80% 34%),
+      hsl(160 84% 42%)
+    );
+  }
+
+  /* Nền gradient thương hiệu (logo, nút nổi bật) */
+  .bg-gradient-brand {
+    background-image: linear-gradient(
+      135deg,
+      hsl(174 80% 34%),
+      hsl(160 84% 40%)
+    );
+  }
+}
+
+@layer utilities {
+  /* Hiệu ứng xuất hiện nhẹ cho nội dung trang — tôn trọng reduced-motion */
+  @media (prefers-reduced-motion: no-preference) {
+    .animate-fade-up {
+      animation: fade-up 0.4s ease-out both;
+    }
+    .animate-fade-in {
+      animation: fade-in 0.3s ease-out both;
+    }
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Thanh cuộn mảnh, hợp tông màu */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }

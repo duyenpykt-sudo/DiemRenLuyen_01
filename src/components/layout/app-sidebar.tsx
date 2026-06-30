@@ -59,12 +59,14 @@ export function AppSidebar({ role }: { role: Role }) {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+        <div className="flex items-center gap-3 px-2 py-3">
+          <div className="bg-gradient-brand flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-md shadow-primary/30">
             <GraduationCap className="h-5 w-5" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold">Điểm Rèn luyện</span>
+            <span className="text-gradient-brand text-sm font-bold tracking-tight">
+              Điểm Rèn luyện
+            </span>
             <span className="text-xs text-muted-foreground">
               Khoa KHTN và CNTT
             </span>

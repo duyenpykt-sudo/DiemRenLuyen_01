@@ -66,7 +66,7 @@ export function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background px-4">
+    <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b bg-background/70 px-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-2 h-6" />
 
@@ -87,7 +87,9 @@ export function Topbar({
         <DropdownMenu>
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 outline-none hover:bg-accent">
             <Avatar className="h-8 w-8">
-              <AvatarFallback>{getInitials(fullName)}</AvatarFallback>
+              <AvatarFallback className="bg-gradient-brand text-xs font-semibold text-white">
+                {getInitials(fullName)}
+              </AvatarFallback>
             </Avatar>
             <div className="hidden text-left leading-tight sm:block">
               <p className="text-sm font-medium">{fullName}</p>

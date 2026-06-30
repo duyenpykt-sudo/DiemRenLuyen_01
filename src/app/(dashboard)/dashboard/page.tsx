@@ -25,9 +25,9 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tổng quan</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Tổng quan</h1>
         <p className="text-muted-foreground">
-          Xin chào {session!.user.name}.
+          Xin chào <span className="font-medium text-foreground">{session!.user.name}</span> 👋
         </p>
       </div>
       {role === Role.ADMIN && <AdminDashboard />}
@@ -39,23 +39,47 @@ export default async function DashboardPage() {
   );
 }
 
+// Tông màu cho thẻ thống kê — xoay vòng để dashboard sinh động, trẻ trung.
+const STAT_TONES = {
+  teal: "from-teal-500/15 to-emerald-500/10 text-teal-600 dark:text-teal-400",
+  emerald:
+    "from-emerald-500/15 to-green-500/10 text-emerald-600 dark:text-emerald-400",
+  sky: "from-sky-500/15 to-cyan-500/10 text-sky-600 dark:text-sky-400",
+  violet:
+    "from-violet-500/15 to-fuchsia-500/10 text-violet-600 dark:text-violet-400",
+} as const;
+
 function StatCard({
   title,
   value,
   icon: Icon,
+  tone = "teal",
 }: {
   title: string;
   value: number;
   icon: React.ComponentType<{ className?: string }>;
+  tone?: keyof typeof STAT_TONES;
 }) {
   return (
-    <Card>
+    <Card className="relative overflow-hidden">
+      {/* Vệt gradient trang trí góc trên phải */}
+      <div
+        className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br opacity-60 blur-2xl ${STAT_TONES[tone]}`}
+      />
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-5 w-5 text-muted-foreground" />
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${STAT_TONES[tone]}`}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
+        <div className="text-3xl font-bold tracking-tight tabular-nums">
+          {value}
+        </div>
       </CardContent>
     </Card>
   );
@@ -83,10 +107,10 @@ async function AdminDashboard() {
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Tổng sinh viên" value={totalStudents} icon={Users} />
-        <StatCard title="Tổng lớp" value={totalClasses} icon={School} />
-        <StatCard title="Tổng CVHT" value={totalCvht} icon={UserCog} />
-        <StatCard title="Tổng học kỳ" value={totalSemesters} icon={CalendarDays} />
+        <StatCard title="Tổng sinh viên" value={totalStudents} icon={Users} tone="teal" />
+        <StatCard title="Tổng lớp" value={totalClasses} icon={School} tone="emerald" />
+        <StatCard title="Tổng CVHT" value={totalCvht} icon={UserCog} tone="sky" />
+        <StatCard title="Tổng học kỳ" value={totalSemesters} icon={CalendarDays} tone="violet" />
       </div>
       <Card>
         <CardHeader>
