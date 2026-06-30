@@ -8,6 +8,8 @@ import { http } from "@/lib/http";
 import type { ClassOption, ScoresResponse, SemesterOption } from "@/types/score";
 import { ModeA } from "@/components/scores/mode-a";
 import { ModeB } from "@/components/scores/mode-b";
+import { ExportMenu } from "@/components/scores/export-menu";
+import { ImportExcelButton } from "@/components/scores/import-excel-button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -47,13 +49,35 @@ export default function ScoresPage() {
   const onChanged = () => qc.invalidateQueries({ queryKey: scoresKey });
   const locked = data?.semester.isLocked ?? false;
 
+  const selectedClass = classes.find((c) => c.id === classId);
+  const selectedSemester = semesters.find((s) => s.id === semesterId);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Điểm rèn luyện</h1>
-        <p className="text-muted-foreground">
-          Nhập, sửa điểm rèn luyện theo lớp và học kỳ.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Điểm rèn luyện</h1>
+          <p className="text-muted-foreground">
+            Nhập, sửa điểm rèn luyện theo lớp và học kỳ.
+          </p>
+        </div>
+        {enabled && data && selectedClass && selectedSemester && (
+          <div className="flex items-center gap-2">
+            {data.canMutate && !locked && (
+              <ImportExcelButton
+                classId={classId}
+                semesterId={semesterId}
+                onDone={onChanged}
+              />
+            )}
+            <ExportMenu
+              classId={classId}
+              semesterId={semesterId}
+              academicYearId={selectedSemester.academicYearId}
+              cohortId={selectedClass.cohortId}
+            />
+          </div>
+        )}
       </div>
 
       {/* Bộ lọc Lớp + Học kỳ */}

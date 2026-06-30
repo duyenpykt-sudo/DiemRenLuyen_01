@@ -14,6 +14,7 @@ export async function GET() {
       number: true,
       name: true,
       isLocked: true,
+      academicYearId: true,
       academicYear: { select: { name: true } },
     },
   });

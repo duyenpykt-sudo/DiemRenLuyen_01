@@ -24,6 +24,7 @@ export type ClassOption = {
   id: string;
   code: string;
   name: string;
+  cohortId: string;
   faculty: { name: string };
 };
 
@@ -32,5 +33,6 @@ export type SemesterOption = {
   number: number;
   name: string;
   isLocked: boolean;
+  academicYearId: string;
   academicYear: { name: string };
 };
