@@ -1,6 +1,8 @@
-# Bộ Prompt cho Claude Code — Theo từng Tuần Roadmap (v1.2)
+# Bộ Prompt cho Claude Code — Theo từng Tuần Roadmap (v1.3)
 
 > **Cách dùng:** Mở Claude Code trong thư mục dự án, đặt file `PRD-DiemRenLuyen.md` ở root, rồi dán lần lượt từng prompt dưới đây.
+>
+> **Bổ sung v1.3:** 3 prompt làm rõ tính năng (Quản lý Năm học & Học kỳ, Nhập điểm theo Lớp × HK × Năm học, Import bảng tổng hợp HK theo lớp) nằm ở mục **"🆕 Bổ sung v1.3"** cuối file. Dán chúng nếu project đã build xong Tuần 2–4 và cần chỉnh cho khớp PRD v1.3.
 
 ---
 
@@ -316,6 +318,107 @@ Tuần cuối.
    - Bonus: npm run package:exe (pkg/nexe đóng gói .exe Windows).
 
 Chạy test, gửi report. Tag git v1.0.0.
+```
+
+---
+
+## 🆕 Bổ sung v1.3 — Làm rõ 3 nhóm tính năng
+
+> Dán 3 prompt dưới đây (theo thứ tự) sau khi đã xong Tuần 2–4, để chỉnh cho khớp PRD v1.3 (mục 5.3.1, 5.4, 5.5). Nếu build mới, có thể lồng vào Tuần 2/3/4 tương ứng.
+
+### 🅰️ Prompt B1 — Quản lý Năm học & Học kỳ (bổ sung mục 5.3.1)
+
+```
+Đọc mục 5.3.1 PRD-DiemRenLuyen.md (v1.3). Bổ sung/hoàn thiện trang quản lý danh mục
+"Năm học & Học kỳ" (chỉ Admin) tại /admin/academic-years.
+
+Yêu cầu:
+1. Model dùng đúng AcademicYear + Semester đã có trong schema (mục 4) — KHÔNG thêm field mới.
+
+2. Quản lý Năm học (AcademicYear):
+   - Dialog thêm/sửa: field name, startYear, endYear.
+   - Zod schema riêng: startYear ∈ 2000..2100; endYear === startYear + 1; name UNIQUE.
+   - Auto-fill: khi nhập startYear → tự set endYear = startYear+1 và name = `${startYear}-${endYear}`
+     (vẫn cho sửa tay).
+   - Checkbox "Tạo sẵn HK1 & HK2": khi tạo Năm học mới, tạo luôn 2 Semester (number 1,2;
+     name "Học kỳ 1"/"Học kỳ 2").
+
+3. Quản lý Học kỳ (Semester):
+   - Dialog thêm/sửa: combobox academicYearId, number (1|2), name, switch isLocked.
+   - Zod: number ∈ {1,2}; enforce UNIQUE(academicYearId, number) — trả lỗi rõ ràng khi trùng.
+   - name auto gợi ý theo number.
+
+4. UI: bảng nhóm theo Năm học → xổ danh sách HK con; badge Khóa/Mở + số ConductScore đang gắn.
+
+5. Ràng buộc xóa: nếu AcademicYear/Semester còn ConductScore tham chiếu → CHẶN xóa,
+   toast cảnh báo, gợi ý dùng "Khóa" thay vì xóa.
+
+6. Mọi thao tác thêm/sửa/xóa/khóa ghi audit log (entityType 'AcademicYear' | 'Semester',
+   old/new value JSON).
+
+7. Các combobox chọn HK ở /scores, import, export phải đọc từ danh mục này (nguồn duy nhất);
+   khi chọn Năm học thì HK lọc theo academicYearId.
+
+Sau khi xong: tạo thử Năm học "2026-2027" + 2 HK, thử tạo HK trùng number (phải báo lỗi),
+screenshot trang danh mục.
+```
+
+### 🅱️ Prompt B2 — Nhập điểm theo Lớp × Học kỳ × Năm học (bổ sung mục 5.4)
+
+```
+Đọc mục 5.4 PRD-DiemRenLuyen.md (v1.3). Chỉnh trang /scores để bắt buộc chọn đủ 3 chiều
+trước khi nhập điểm.
+
+Yêu cầu:
+1. Bộ lọc top gồm 3 dropdown phụ thuộc nhau, theo thứ tự:
+   Năm học → Học kỳ (chỉ hiện HK thuộc năm học đã chọn) → Lớp (CVHT chỉ thấy lớp mình advise;
+   Admin thấy tất cả).
+2. Chỉ khi chọn đủ 3 → mới load bảng SV của lớp đó cho đúng semesterId để nhập điểm.
+   Trước đó hiện empty state hướng dẫn.
+3. Mỗi ô điểm map đúng 1 ConductScore theo UNIQUE(studentId, semesterId).
+4. Giữ nguyên 2 mode (Form Dialog + Bảng inline) đã có; chỉ thay đổi phần filter + điều kiện load.
+5. Nếu Semester.isLocked=true → banner "HK đã chốt" + readonly (giữ như cũ).
+6. Xếp loại recompute server-side khi lưu (không tin client).
+7. Không đổi API contract nếu đã đúng; chỉ đảm bảo semesterId truyền lên khớp HK+Năm học đã chọn.
+
+Sau khi xong: login CVHT, chọn 2025-2026 → HK1 → DC22CTT01, nhập 1 điểm mỗi mode,
+screenshot bộ lọc 3 tầng.
+```
+
+### 🅲 Prompt B3 — Import bảng tổng hợp điểm HK theo lớp (bổ sung mục 5.5)
+
+```
+Đọc mục 5.5 PRD-DiemRenLuyen.md (v1.3). Hoàn thiện Import Excel từ "Bảng tổng hợp điểm
+rèn luyện từng học kỳ theo lớp" (sheet HỌC KỲ / HỌC KỲ 2). Giữ nguyên feature flag
+IMPORT_EXCEL_ENABLED (mục CLAUDE.md).
+
+Yêu cầu:
+1. Dialog import chọn đích theo 3 chiều Năm học → Học kỳ → Lớp (như /scores).
+2. Bước preview (POST /api/import/excel/preview) trả cho mỗi dòng:
+   { row, cccd, maSV, hoTen, diem, xepLoai (RECOMPUTE server-side), matchStatus, action, error? }
+   - matchStatus: matched | not_in_db | not_in_target_class
+   - action: create | overwrite | skip
+3. Quy tắc:
+   - Đối chiếu SV theo maSV trước, fallback cccd.
+   - Xếp loại LUÔN recompute từ điểm (mục 6.1), KHÔNG lấy cột "Xếp loại" trong Excel.
+   - Nếu SV đã có điểm ở HK đích (trùng UNIQUE studentId+semesterId) → action=overwrite,
+     đánh dấu "sẽ ghi đè", mặc định KHÔNG tick; CVHT tick mới cập nhật.
+   - maSV không thuộc lớp đích → matchStatus=not_in_target_class, mặc định skip + cảnh báo.
+   - Điểm không phải integer 0-100 → error, chặn commit dòng đó.
+   - Dừng parse khi gặp "THỐNG KÊ:" hoặc 3 dòng trống liên tiếp.
+4. Commit (POST /api/import/excel/commit): chỉ ghi các dòng hợp lệ + được chọn;
+   audit log IMPORT_EXCEL kèm { filename, classId, semesterId, academicYearId,
+   rowsSuccess, rowsOverwritten, rowsSkipped, rowsFailed }.
+5. Cả preview + commit check features.importExcel đầu handler → 403 nếu tắt.
+6. UI preview: highlight màu theo action (create=xanh, overwrite=vàng, skip=xám, error=đỏ),
+   checkbox chọn/bỏ từng dòng, đếm tổng theo action.
+
+Kiểm tra:
+- Flag=true, import file mẫu DC22CTT01-II-25-26.xls (sheet HỌC KỲ) vào DC22CTT01/HK1/2025-2026
+  → preview đúng, commit → điểm vào DB.
+- Import lại lần 2 → tất cả dòng thành "overwrite" (mặc định không tick → không đổi gì).
+- Flag=false → nút ẩn + API 403.
+Screenshot preview có đủ 4 màu trạng thái.
 ```
 
 ---

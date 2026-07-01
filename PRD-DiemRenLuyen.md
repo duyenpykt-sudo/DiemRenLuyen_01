@@ -1,13 +1,14 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.2  
-**Ngày:** 29/06/2026  
+**Phiên bản:** 1.3  
+**Ngày:** 01/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
 > **Lịch sử thay đổi:**
 > - v1.0 (ban đầu): có nhập điểm inline + import Excel UI.
 > - v1.1: tạm cắt 2 tính năng trên khỏi MVP.
-> - **v1.2 (hiện tại): khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.**
+> - v1.2: khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.
+> - **v1.3 (hiện tại): làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).**
 
 ---
 
@@ -255,7 +256,43 @@ CRUD cho: Khoa, Khóa học, Năm học, Học kỳ, Lớp, Sinh viên, Người
 - **Sinh viên**: cho phép chuyển lớp, thay đổi trạng thái (active/suspended/graduated/dropped).
 - **Lớp**: bắt buộc gán CVHT.
 
+#### 5.3.1. Quản lý Năm học & Học kỳ (chi tiết)
+
+Tab **"Năm học & Học kỳ"** trong Quản lý danh mục (chỉ **Admin**). Năm học là cha, Học kỳ là con (`Semester.academicYearId → AcademicYear`).
+
+**Thêm/sửa Năm học** (`AcademicYear`):
+- Form Dialog với các field:
+  - `name` — tên hiển thị, vd `2025-2026` (bắt buộc, **UNIQUE**).
+  - `startYear` — số nguyên 4 chữ số, vd `2025` (bắt buộc).
+  - `endYear` — số nguyên 4 chữ số, vd `2026` (bắt buộc, phải `= startYear + 1`).
+- Validation Zod: `startYear` trong khoảng 2000–2100; `endYear === startYear + 1`; `name` không trùng.
+- **Gợi ý tự động**: khi nhập `startYear`, auto điền `endYear = startYear + 1` và `name = "${startYear}-${endYear}"` (vẫn cho sửa tay).
+- Khi tạo Năm học mới, cho phép (tùy chọn) **tạo nhanh 2 học kỳ** HK1/HK2 kèm theo (checkbox "Tạo sẵn HK1 & HK2").
+
+**Thêm/sửa Học kỳ** (`Semester`):
+- Form Dialog với các field:
+  - `academicYearId` — combobox chọn Năm học (bắt buộc).
+  - `number` — số học kỳ trong năm: `1` hoặc `2` (bắt buộc). Ràng buộc **UNIQUE(academicYearId, number)** — không tạo trùng HK trong cùng năm.
+  - `name` — tên hiển thị, vd `Học kỳ 1`, `Học kỳ 2` (bắt buộc). Gợi ý auto theo `number`.
+  - `isLocked` — mặc định `false`; bật = khóa, mọi API sửa điểm cho HK này trả **403** và UI readonly.
+- Validation Zod: `number ∈ {1, 2}`; cặp `(academicYearId, number)` chưa tồn tại.
+
+**Hành vi & ràng buộc:**
+- Bảng liệt kê Năm học (nhóm) → xổ danh sách Học kỳ con, hiển thị badge trạng thái Khóa/Mở và số bản ghi điểm đang gắn.
+- **Không cho xóa** Năm học/Học kỳ nếu đang có `ConductScore` tham chiếu → hiện cảnh báo, đề xuất khóa thay vì xóa.
+- Mọi thao tác thêm/sửa/xóa/khóa đều ghi **audit log** (`entityType = 'AcademicYear' | 'Semester'`).
+- Các combobox chọn Học kỳ ở trang Nhập điểm, Import, Export đều lấy dữ liệu từ danh mục này (nguồn duy nhất).
+
 ### 5.4. Nhập điểm thủ công
+
+> **Mục tiêu:** cho phép nhập/sửa điểm rèn luyện của **từng sinh viên** theo chiều **Lớp × Học kỳ × Năm học**, làm dữ liệu gốc để cấp **Giấy chứng nhận / Bảng điểm rèn luyện** của sinh viên.
+
+**Bộ lọc bắt buộc trước khi nhập** (áp dụng cho cả 2 mode):
+1. Chọn **Năm học** (từ danh mục mục 5.3.1).
+2. Chọn **Học kỳ** (chỉ hiện các HK thuộc năm học đã chọn).
+3. Chọn **Lớp** (CVHT chỉ thấy lớp mình phụ trách; Admin thấy tất cả).
+
+Sau khi chọn đủ 3 chiều → bảng SV của lớp đó hiện ra để nhập điểm cho đúng học kỳ/năm học. Mỗi ô điểm ứng với đúng 1 `ConductScore` theo ràng buộc **UNIQUE(studentId, semesterId)**.
 
 Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 
@@ -295,19 +332,25 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 >
 > Mục đích: code đầy đủ, ready dùng, nhưng admin có thể tắt trong giai đoạn chưa muốn cho phép import (tránh nhập nhầm/dữ liệu sai).
 
+> **Nguồn dữ liệu:** *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* — chính là sheet `HỌC KỲ` / `HỌC KỲ 2` trong file mẫu của trường. Mỗi lần import ứng với **1 lớp × 1 học kỳ × 1 năm học**.
+
 **Flow khi flag bật:**
 1. CVHT chọn loại import: **Theo học kỳ** (sheet `HỌC KỲ` / `HỌC KỲ 2`).
-2. Chọn lớp + học kỳ đích.
+2. Chọn **Năm học → Học kỳ → Lớp** đích (đúng 3 chiều như mục 5.4; đây là nơi dữ liệu import sẽ ghi vào).
 3. Upload file `.xls` / `.xlsx` (< 5MB).
-4. Hệ thống preview dữ liệu parse được (bảng).
-5. CVHT xác nhận → ghi vào DB.
+4. Hệ thống parse bảng và hiển thị **preview** dạng bảng: STT | CCCD | Mã SV | Họ tên | Điểm | Xếp loại (recompute server-side) | Trạng thái đối chiếu.
+5. CVHT xem preview, xử lý dòng cảnh báo (SV chưa có trong DB / điểm sai / trùng), rồi **xác nhận** → ghi vào DB.
 
 **Quy tắc parse:**
 - Sheet `HỌC KỲ`: header dòng 7 (`TT | CCCD | Mã SV | Họ tên | Điểm | Xếp loại | Ghi chú`), dữ liệu từ dòng 8.
 - Sheet `HỌC KỲ 2`: tương tự.
 - Đối chiếu SV qua **Mã SV** trước, fallback **CCCD**. Nếu chưa có SV trong DB → cảnh báo + cho phép tạo mới hoặc bỏ qua.
+- **Xếp loại luôn recompute server-side** từ điểm (mục 6.1), **không tin cột "Xếp loại"** trong file Excel.
+- **Ghi đè có kiểm soát**: nếu SV đã có điểm ở HK đích (trùng `UNIQUE(studentId, semesterId)`) → đánh dấu "sẽ ghi đè" trong preview, để CVHT quyết định (mặc định giữ nguyên, tick chọn để cập nhật).
+- Chỉ ghi vào lớp/HK/năm học đã chọn ở bước 2; bỏ qua các dòng có Mã SV không thuộc lớp đích (cảnh báo trong preview).
 - Tự ngắt khi gặp dòng "THỐNG KÊ:" hoặc dòng trống liên tiếp.
-- Lưu audit log: `action = IMPORT_EXCEL`, kèm `filename` + số dòng thành công/lỗi.
+- Validate điểm integer 0–100; dòng sai → đánh dấu lỗi, không cho commit tới khi sửa/bỏ qua.
+- Lưu audit log: `action = IMPORT_EXCEL`, kèm `filename` + Lớp/HK/Năm học đích + số dòng thành công/ghi đè/bỏ qua/lỗi.
 
 **API:**
 - `GET /api/config/features` → trả `{ importExcelEnabled: boolean }` cho client check.
@@ -585,6 +628,9 @@ IMPORT_EXCEL_ENABLED=false
 PRD được coi là hoàn thành khi:
 
 - [ ] Admin đăng nhập, tạo được 1 khoa, 1 khóa, 2 lớp, 2 CVHT, 1 Trưởng khoa.
+- [ ] Admin thêm được 1 Năm học mới (vd `2026-2027`) và 2 Học kỳ (HK1, HK2) trong Quản lý danh mục; không tạo được HK trùng `number` trong cùng năm học (báo lỗi).
+- [ ] Sau khi chọn Năm học → Học kỳ → Lớp, CVHT nhập được điểm cho từng SV; combobox HK chỉ hiện HK thuộc năm học đã chọn.
+- [ ] Khi flag bật: import *Bảng tổng hợp điểm HK theo lớp* vào đúng Lớp/HK/Năm học đã chọn; preview hiển thị dòng "sẽ ghi đè" khi SV đã có điểm; xếp loại được recompute server-side, không lấy từ cột Excel.
 - [ ] CVHT đăng nhập, thấy đúng lớp được gán, không thấy lớp khác.
 - [ ] Chạy `npm run seed:excel -- --file=./sample/DC22CTT01-II-25-26.xls` thành công → 14 SV + điểm các HK đã trong DB.
 - [ ] CVHT thêm 1 điểm mới qua Mode A (Dialog) → xếp loại auto đúng.
