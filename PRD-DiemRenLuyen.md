@@ -9,7 +9,7 @@
 > - v1.1: tạm cắt 2 tính năng trên khỏi MVP.
 > - v1.2: khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.
 > - v1.3: làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).
-> - **v1.4 (hiện tại): thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Claude)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `ANTHROPIC_API_KEY`.**
+> - **v1.4 (hiện tại): thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.**
 
 ---
 
@@ -359,11 +359,11 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - `POST /api/import/excel/commit` → ghi DB.
 - Cả 2 API trên trả 403 nếu flag tắt.
 
-### 5.5.2. Nhận diện & chuẩn hoá file Excel import bằng AI (Claude)
+### 5.5.2. Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)
 
-> ⚠️ **Feature flag riêng**: `AI_IMPORT_ENABLED` trong `.env` (mặc định `false`) + biến `ANTHROPIC_API_KEY`.
+> ⚠️ **Feature flag riêng**: `AI_IMPORT_ENABLED` trong `.env` (mặc định `false`) + biến `GEMINI_API_KEY`.
 > - `AI_IMPORT_ENABLED=false` → toàn bộ chức năng AI ẩn; API `/api/import/excel/ai-analyze` trả **403**; luồng import chạy 100% bằng parser tất định (mục 5.5).
-> - `AI_IMPORT_ENABLED=true` **và** có `ANTHROPIC_API_KEY` hợp lệ → nút "Phân tích bằng AI" xuất hiện ở bước preview.
+> - `AI_IMPORT_ENABLED=true` **và** có `GEMINI_API_KEY` hợp lệ → nút "Phân tích bằng AI" xuất hiện ở bước preview.
 > - Cả 2 flag `IMPORT_EXCEL_ENABLED` và `AI_IMPORT_ENABLED` đều phải bật thì AI mới hoạt động (AI là phần mở rộng của Import Excel, không phải luồng độc lập).
 
 **Vấn đề giải quyết:** File Excel bảng tổng hợp điểm rèn luyện của trường **thay đổi theo từng năm học** — đổi tên cột (`Mã SV` ↔ `MSSV` ↔ `Mã sinh viên`), đổi tên sheet (`HỌC KỲ` ↔ `HK1` ↔ `Học kỳ I`), thêm/xoá/xê dịch cột, gộp ô tiêu đề khác vị trí, và **một số ô dữ liệu chưa chuẩn** (điểm ghi kèm chữ "đ", MSSV thiếu số 0 đầu, CCCD 11 số, họ tên và mã bị đảo cột…). Parser tất định (mục 5.5) bám header cố định dòng 7 nên dễ gãy khi format lệch.
@@ -380,16 +380,16 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - **Giá trị chuẩn hoá do AI đề xuất** (vd điểm `"85đ"` → `85`) phải qua lại validation Zod (integer 0–100…) ở server trước khi được chấp nhận.
 
 **Quyền riêng tư (BẮT BUỘC nêu rõ cho người dùng):**
-- Bật AI = **gửi dữ liệu file (header + các dòng SV: CCCD, MSSV, họ tên, điểm) tới Anthropic API** để phân tích. Đây là dịch vụ ngoài, chạy trên internet — khác với phần còn lại của app (offline/localhost).
-- Vì vậy flag mặc định **OFF**. UI phải hiện cảnh báo "Dữ liệu sẽ được gửi tới dịch vụ AI (Anthropic) để phân tích" và yêu cầu CVHT xác nhận (checkbox) trước lần chạy đầu.
+- Bật AI = **gửi dữ liệu file (header + các dòng SV: CCCD, MSSV, họ tên, điểm) tới Google Gemini API** để phân tích. Đây là dịch vụ ngoài, chạy trên internet — khác với phần còn lại của app (offline/localhost).
+- Vì vậy flag mặc định **OFF**. UI phải hiện cảnh báo "Dữ liệu sẽ được gửi tới dịch vụ AI (Google Gemini) để phân tích" và yêu cầu CVHT xác nhận (checkbox) trước lần chạy đầu.
 - Ghi audit log `action = AI_ANALYZE_IMPORT` kèm `{ filename, sheet, rowsAnalyzed }` (không log nội dung điểm chi tiết vào oldValue/newValue).
 
 **Kỹ thuật (chốt theo Tech Stack):**
-- SDK: `@anthropic-ai/sdk` (chính thức). Model mặc định `claude-opus-4-8`; cho phép cấu hình `AI_IMPORT_MODEL` để đổi sang model rẻ hơn (`claude-haiku-4-5`, `claude-sonnet-4-6`) tuỳ nhu cầu chi phí.
-- Dùng **Structured Outputs** để ép JSON đúng schema: gọi `client.messages.parse()` với `output_config: { format: { type: "json_schema", schema } }`. Không dùng prefill (đã bỏ trên các model 4.x).
+- SDK: `@google/genai` (Google GenAI SDK chính thức). Model mặc định `gemini-2.5-flash` (rẻ, nhanh, đủ cho tác vụ nhận diện cấu trúc); cho phép cấu hình `GEMINI_MODEL` để đổi sang model mạnh hơn (`gemini-2.5-pro`) hoặc model mới hơn tuỳ nhu cầu.
+- Dùng **Structured Output** của Gemini để ép JSON đúng schema: cấu hình `responseMimeType: "application/json"` + `responseSchema` (JSON schema tương ứng `AiImportAnalysisSchema`). **KHÔNG** parse thủ công text tự do.
 - Prompt đưa vào: tên các sheet, header dòng 1–7 và tối đa ~15 dòng dữ liệu mẫu (đủ để AI nhận diện, không gửi toàn bộ file nếu không cần). Với file > 200 dòng, chỉ gửi mẫu để lấy ánh xạ cột rồi áp ánh xạ đó cho toàn file bằng code tất định.
-- Server-side validate lại toàn bộ output AI bằng Zod (schema `AiImportAnalysisSchema`) trước khi trả về client — không tin cấu trúc trả về từ model.
-- Xử lý lỗi: hết quota/`ANTHROPIC_API_KEY` sai/timeout → trả thông báo tiếng Việt, tự động fallback về parser tất định (không chặn CVHT nhập tay).
+- Server-side validate lại toàn bộ output AI bằng Zod (schema `AiImportAnalysisSchema`) trước khi trả về client — không tin cấu trúc trả về từ model dù đã khai báo `responseSchema`.
+- Xử lý lỗi: hết quota/`GEMINI_API_KEY` sai/timeout → trả thông báo tiếng Việt, tự động fallback về parser tất định (không chặn CVHT nhập tay).
 
 **Schema kết quả AI (server trả cho client, dạng preview):**
 ```jsonc
@@ -419,7 +419,7 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 5. CVHT duyệt → hệ thống dựng lại bảng theo ánh xạ đã chốt → **preview chuẩn của 5.5** (recompute xếp loại server-side) → commit.
 
 **API:**
-- `POST /api/import/excel/ai-analyze` (multipart hoặc JSON các dòng đã đọc) → trả `AiImportAnalysisSchema`. Trả **403** nếu `AI_IMPORT_ENABLED=false` hoặc thiếu `ANTHROPIC_API_KEY`. Trả 502 + thông báo tiếng Việt nếu gọi Anthropic thất bại.
+- `POST /api/import/excel/ai-analyze` (multipart hoặc JSON các dòng đã đọc) → trả `AiImportAnalysisSchema`. Trả **403** nếu `AI_IMPORT_ENABLED=false` hoặc thiếu `GEMINI_API_KEY`. Trả 502 + thông báo tiếng Việt nếu gọi Gemini thất bại.
 - `GET /api/config/features` bổ sung trường `{ aiImportEnabled: boolean }` để client ẩn/hiện nút.
 
 ### 5.6. Seed dữ liệu CLI (chạy 1 lần lúc cài đặt)
@@ -603,7 +603,7 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 | DB | SQLite (file `prisma/dev.db`) |
 | Auth | next-auth v5 (Credentials) |
 | Excel I/O | exceljs (đọc/ghi `.xlsx`), `xlsx` (fallback cho `.xls` cũ) |
-| AI nhận diện import | `@anthropic-ai/sdk` (Claude) — model mặc định `claude-opus-4-8`, cấu hình qua `AI_IMPORT_MODEL`; dùng Structured Outputs (`messages.parse` + `output_config.format`) |
+| AI nhận diện import | `@google/genai` (Google Gemini) — model mặc định `gemini-2.5-flash`, cấu hình qua `GEMINI_MODEL`; dùng Structured Output (`responseMimeType: application/json` + `responseSchema`) |
 | Charts | recharts |
 | Bcrypt | bcryptjs |
 | Notification | sonner |
@@ -686,10 +686,10 @@ NEXTAUTH_URL="http://localhost:3000"
 IMPORT_EXCEL_ENABLED=false
 
 # AI nhận diện file Excel import (mục 5.5.2) — mặc định OFF
-# Bật = gửi dữ liệu file tới Anthropic API để phân tích (dịch vụ ngoài)
+# Bật = gửi dữ liệu file tới Google Gemini API để phân tích (dịch vụ ngoài)
 AI_IMPORT_ENABLED=false
-ANTHROPIC_API_KEY=""
-AI_IMPORT_MODEL="claude-opus-4-8"   # có thể đổi: claude-haiku-4-5 | claude-sonnet-4-6
+GEMINI_API_KEY=""
+GEMINI_MODEL="gemini-2.5-flash"   # có thể đổi: gemini-2.5-pro
 ```
 
 ---
@@ -702,7 +702,7 @@ PRD được coi là hoàn thành khi:
 - [ ] Admin thêm được 1 Năm học mới (vd `2026-2027`) và 2 Học kỳ (HK1, HK2) trong Quản lý danh mục; không tạo được HK trùng `number` trong cùng năm học (báo lỗi).
 - [ ] Sau khi chọn Năm học → Học kỳ → Lớp, CVHT nhập được điểm cho từng SV; combobox HK chỉ hiện HK thuộc năm học đã chọn.
 - [ ] Khi flag bật: import *Bảng tổng hợp điểm HK theo lớp* vào đúng Lớp/HK/Năm học đã chọn; preview hiển thị dòng "sẽ ghi đè" khi SV đã có điểm; xếp loại được recompute server-side, không lấy từ cột Excel.
-- [ ] Khi `AI_IMPORT_ENABLED=false` (hoặc thiếu `ANTHROPIC_API_KEY`): nút "Phân tích bằng AI" ẨN; gọi trực tiếp `/api/import/excel/ai-analyze` trả **403**; import vẫn chạy được bằng parser tất định.
+- [ ] Khi `AI_IMPORT_ENABLED=false` (hoặc thiếu `GEMINI_API_KEY`): nút "Phân tích bằng AI" ẨN; gọi trực tiếp `/api/import/excel/ai-analyze` trả **403**; import vẫn chạy được bằng parser tất định.
 - [ ] Khi `AI_IMPORT_ENABLED=true`: với file đổi tên cột/sheet, AI đề xuất ánh xạ cột + gắn cờ dòng nghi ngờ (điểm có ký tự lạ, MSSV sai regex); CVHT duyệt trước khi commit; xếp loại vẫn recompute server-side (không lấy từ AI); có cảnh báo quyền riêng tư trước lần chạy đầu và audit log `AI_ANALYZE_IMPORT`.
 - [ ] CVHT đăng nhập, thấy đúng lớp được gán, không thấy lớp khác.
 - [ ] Chạy `npm run seed:excel -- --file=./sample/DC22CTT01-II-25-26.xls` thành công → 14 SV + điểm các HK đã trong DB.

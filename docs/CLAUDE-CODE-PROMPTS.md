@@ -4,7 +4,7 @@
 >
 > **Bổ sung v1.3:** 3 prompt làm rõ tính năng (Quản lý Năm học & Học kỳ, Nhập điểm theo Lớp × HK × Năm học, Import bảng tổng hợp HK theo lớp) nằm ở mục **"🆕 Bổ sung v1.3"** cuối file. Dán chúng nếu project đã build xong Tuần 2–4 và cần chỉnh cho khớp PRD v1.3.
 >
-> **Bổ sung v1.4:** prompt B4 — *AI nhận diện & chuẩn hoá file Excel import (Claude)* — nằm ở mục **"🆕 Bổ sung v1.4"** cuối file. Đứng sau flag `AI_IMPORT_ENABLED` + `ANTHROPIC_API_KEY`.
+> **Bổ sung v1.4:** prompt B4 — *AI nhận diện & chuẩn hoá file Excel import (Google Gemini)* — nằm ở mục **"🆕 Bổ sung v1.4"** cuối file. Đứng sau flag `AI_IMPORT_ENABLED` + `GEMINI_API_KEY`.
 
 ---
 
@@ -425,7 +425,7 @@ Screenshot preview có đủ 4 màu trạng thái.
 
 ---
 
-## 🆕 Bổ sung v1.4 — AI nhận diện file Excel import
+## 🆕 Bổ sung v1.4 — AI nhận diện file Excel import (Google Gemini)
 
 > Dán prompt B4 sau khi đã xong Import Excel (Tuần 4 / prompt B3). Đây là phần mở rộng của Import, không phải luồng độc lập.
 
@@ -433,16 +433,15 @@ Screenshot preview có đủ 4 màu trạng thái.
 
 ```
 Đọc mục 5.5.2 PRD-DiemRenLuyen.md (v1.4). Thêm tính năng AI nhận diện & chuẩn hoá
-file Excel import, đứng sau feature flag AI_IMPORT_ENABLED + ANTHROPIC_API_KEY.
+file Excel import bằng Google Gemini, đứng sau feature flag AI_IMPORT_ENABLED + GEMINI_API_KEY.
 CHỈ hoạt động khi CẢ IMPORT_EXCEL_ENABLED và AI_IMPORT_ENABLED đều bật.
 
 Kỹ thuật (bám Tech Stack đã chốt):
-1. Dùng SDK CHÍNH THỨC @anthropic-ai/sdk. Model mặc định "claude-opus-4-8",
-   đọc từ env AI_IMPORT_MODEL (cho phép claude-haiku-4-5 / claude-sonnet-4-6).
-2. Ép JSON bằng Structured Outputs: client.messages.parse() với
-   output_config: { format: { type: "json_schema", schema } }. KHÔNG dùng prefill
-   (đã bỏ trên model 4.x). Với thinking, nếu cần dùng { type: "adaptive" }.
-3. lib/features.ts thêm: aiImport = AI_IMPORT_ENABLED === 'true' && !!ANTHROPIC_API_KEY.
+1. Dùng SDK CHÍNH THỨC @google/genai (Google GenAI SDK). Model mặc định "gemini-2.5-flash",
+   đọc từ env GEMINI_MODEL (cho phép gemini-2.5-pro). Khởi tạo client bằng GEMINI_API_KEY.
+2. Ép JSON bằng Structured Output của Gemini: config responseMimeType: "application/json"
+   + responseSchema (JSON schema tương ứng AiImportAnalysisSchema). KHÔNG parse text tự do.
+3. lib/features.ts thêm: aiImport = AI_IMPORT_ENABLED === 'true' && !!GEMINI_API_KEY.
    GET /api/config/features trả thêm { aiImportEnabled: boolean }.
 
 Server (lib/ai-import.ts):
@@ -451,15 +450,15 @@ Server (lib/ai-import.ts):
 - Zod schema AiImportAnalysisSchema đúng như mục 5.5.2:
   { sheetGuess, columnMapping: { stt|cccd|maSV|hoTen|diem|ghiChu: {col, confidence} },
     rowAnomalies: [{ row, field, value, suggestedValue, reason }] }.
-- VALIDATE lại toàn bộ output của model bằng Zod trước khi trả client (không tin cấu trúc trả về).
+- VALIDATE lại toàn bộ output của model bằng Zod trước khi trả client (dù đã khai báo responseSchema).
 - Áp ánh xạ cột (từ mẫu) cho TOÀN file bằng code tất định, không nhờ AI đọc hết file.
-- Xử lý lỗi: thiếu/ sai ANTHROPIC_API_KEY, hết quota, timeout → thông báo tiếng Việt,
+- Xử lý lỗi: thiếu/ sai GEMINI_API_KEY, hết quota, timeout → thông báo tiếng Việt,
   fallback về parser tất định (mục 5.5), không chặn nhập tay.
 
 API:
 - POST /api/import/excel/ai-analyze → trả AiImportAnalysisSchema.
   ĐẦU HÀM check features.aiImport — false thì trả 403.
-  Gọi Anthropic thất bại → 502 + message tiếng Việt.
+  Gọi Gemini thất bại → 502 + message tiếng Việt.
 - Ghi audit log action=AI_ANALYZE_IMPORT với { filename, sheet, rowsAnalyzed }
   (KHÔNG log nội dung điểm chi tiết vào oldValue/newValue).
 
@@ -472,7 +471,7 @@ Ranh giới bắt buộc:
 
 UI (mở rộng Dialog import ở /scores):
 - Nút "Phân tích bằng AI" chỉ hiện khi aiImportEnabled=true (check qua /api/config/features).
-- Trước lần chạy đầu: hiện CẢNH BÁO quyền riêng tư "Dữ liệu sẽ được gửi tới dịch vụ AI (Anthropic)
+- Trước lần chạy đầu: hiện CẢNH BÁO quyền riêng tư "Dữ liệu sẽ được gửi tới dịch vụ AI (Google Gemini)
   để phân tích" + checkbox xác nhận, mới cho gọi.
 - Hiển thị: ánh xạ cột AI đề xuất (combobox cho CVHT sửa) + danh sách dòng nghi ngờ
   (mỗi dòng có nút "Áp giá trị đề xuất" / "Bỏ qua").
