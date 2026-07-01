@@ -1,8 +1,10 @@
-# Bộ Prompt cho Claude Code — Theo từng Tuần Roadmap (v1.3)
+# Bộ Prompt cho Claude Code — Theo từng Tuần Roadmap (v1.4)
 
 > **Cách dùng:** Mở Claude Code trong thư mục dự án, đặt file `PRD-DiemRenLuyen.md` ở root, rồi dán lần lượt từng prompt dưới đây.
 >
 > **Bổ sung v1.3:** 3 prompt làm rõ tính năng (Quản lý Năm học & Học kỳ, Nhập điểm theo Lớp × HK × Năm học, Import bảng tổng hợp HK theo lớp) nằm ở mục **"🆕 Bổ sung v1.3"** cuối file. Dán chúng nếu project đã build xong Tuần 2–4 và cần chỉnh cho khớp PRD v1.3.
+>
+> **Bổ sung v1.4:** prompt B4 — *AI nhận diện & chuẩn hoá file Excel import (Claude)* — nằm ở mục **"🆕 Bổ sung v1.4"** cuối file. Đứng sau flag `AI_IMPORT_ENABLED` + `ANTHROPIC_API_KEY`.
 
 ---
 
@@ -419,6 +421,68 @@ Kiểm tra:
 - Import lại lần 2 → tất cả dòng thành "overwrite" (mặc định không tick → không đổi gì).
 - Flag=false → nút ẩn + API 403.
 Screenshot preview có đủ 4 màu trạng thái.
+```
+
+---
+
+## 🆕 Bổ sung v1.4 — AI nhận diện file Excel import
+
+> Dán prompt B4 sau khi đã xong Import Excel (Tuần 4 / prompt B3). Đây là phần mở rộng của Import, không phải luồng độc lập.
+
+### 🅳 Prompt B4 — AI nhận diện & chuẩn hoá file import (bổ sung mục 5.5.2)
+
+```
+Đọc mục 5.5.2 PRD-DiemRenLuyen.md (v1.4). Thêm tính năng AI nhận diện & chuẩn hoá
+file Excel import, đứng sau feature flag AI_IMPORT_ENABLED + ANTHROPIC_API_KEY.
+CHỈ hoạt động khi CẢ IMPORT_EXCEL_ENABLED và AI_IMPORT_ENABLED đều bật.
+
+Kỹ thuật (bám Tech Stack đã chốt):
+1. Dùng SDK CHÍNH THỨC @anthropic-ai/sdk. Model mặc định "claude-opus-4-8",
+   đọc từ env AI_IMPORT_MODEL (cho phép claude-haiku-4-5 / claude-sonnet-4-6).
+2. Ép JSON bằng Structured Outputs: client.messages.parse() với
+   output_config: { format: { type: "json_schema", schema } }. KHÔNG dùng prefill
+   (đã bỏ trên model 4.x). Với thinking, nếu cần dùng { type: "adaptive" }.
+3. lib/features.ts thêm: aiImport = AI_IMPORT_ENABLED === 'true' && !!ANTHROPIC_API_KEY.
+   GET /api/config/features trả thêm { aiImportEnabled: boolean }.
+
+Server (lib/ai-import.ts):
+- Hàm analyzeExcelWithAI(sheets): chỉ gửi cho model tên các sheet + header dòng 1–7
+  + tối đa ~15 dòng dữ liệu mẫu (không gửi toàn bộ file nếu >200 dòng).
+- Zod schema AiImportAnalysisSchema đúng như mục 5.5.2:
+  { sheetGuess, columnMapping: { stt|cccd|maSV|hoTen|diem|ghiChu: {col, confidence} },
+    rowAnomalies: [{ row, field, value, suggestedValue, reason }] }.
+- VALIDATE lại toàn bộ output của model bằng Zod trước khi trả client (không tin cấu trúc trả về).
+- Áp ánh xạ cột (từ mẫu) cho TOÀN file bằng code tất định, không nhờ AI đọc hết file.
+- Xử lý lỗi: thiếu/ sai ANTHROPIC_API_KEY, hết quota, timeout → thông báo tiếng Việt,
+  fallback về parser tất định (mục 5.5), không chặn nhập tay.
+
+API:
+- POST /api/import/excel/ai-analyze → trả AiImportAnalysisSchema.
+  ĐẦU HÀM check features.aiImport — false thì trả 403.
+  Gọi Anthropic thất bại → 502 + message tiếng Việt.
+- Ghi audit log action=AI_ANALYZE_IMPORT với { filename, sheet, rowsAnalyzed }
+  (KHÔNG log nội dung điểm chi tiết vào oldValue/newValue).
+
+Ranh giới bắt buộc:
+- AI CHỈ đề xuất; mọi thay đổi phải CVHT duyệt tay trên preview trước commit. Không ghi thẳng vào DB.
+- Xếp loại LUÔN recompute server-side từ điểm (mục 6.1) — không lấy từ AI/Excel.
+- Ưu tiên parser tất định: nếu parser map đủ cột + không lỗi thì KHÔNG gọi AI.
+  AI chỉ chạy khi parser thiếu cột/lỗi HOẶC CVHT bấm "Phân tích bằng AI".
+- suggestedValue của AI (vd "85đ"→85) phải qua lại validation Zod (điểm int 0–100…) ở server.
+
+UI (mở rộng Dialog import ở /scores):
+- Nút "Phân tích bằng AI" chỉ hiện khi aiImportEnabled=true (check qua /api/config/features).
+- Trước lần chạy đầu: hiện CẢNH BÁO quyền riêng tư "Dữ liệu sẽ được gửi tới dịch vụ AI (Anthropic)
+  để phân tích" + checkbox xác nhận, mới cho gọi.
+- Hiển thị: ánh xạ cột AI đề xuất (combobox cho CVHT sửa) + danh sách dòng nghi ngờ
+  (mỗi dòng có nút "Áp giá trị đề xuất" / "Bỏ qua").
+- Sau khi CVHT chốt ánh xạ → dựng lại bảng → về đúng preview chuẩn của 5.5 (recompute xếp loại) → commit.
+
+Kiểm tra:
+- AI_IMPORT_ENABLED=false (hoặc thiếu key) → nút ẩn; gọi trực tiếp API → 403; import tất định vẫn chạy.
+- AI_IMPORT_ENABLED=true → tạo 1 file test đổi tên cột "Mã SV"→"MSSV" + 1 điểm "85đ"
+  → AI map đúng cột + gắn cờ dòng điểm lỗi + đề xuất 85 → CVHT duyệt → commit → điểm=85 trong DB.
+Screenshot: cảnh báo quyền riêng tư + bảng ánh xạ cột + danh sách dòng nghi ngờ.
 ```
 
 ---

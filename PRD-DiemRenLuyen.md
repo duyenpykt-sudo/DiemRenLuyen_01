@@ -1,6 +1,6 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.3  
+**Phiên bản:** 1.4  
 **Ngày:** 01/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
@@ -8,7 +8,8 @@
 > - v1.0 (ban đầu): có nhập điểm inline + import Excel UI.
 > - v1.1: tạm cắt 2 tính năng trên khỏi MVP.
 > - v1.2: khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.
-> - **v1.3 (hiện tại): làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).**
+> - v1.3: làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).
+> - **v1.4 (hiện tại): thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Claude)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `ANTHROPIC_API_KEY`.**
 
 ---
 
@@ -358,6 +359,69 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - `POST /api/import/excel/commit` → ghi DB.
 - Cả 2 API trên trả 403 nếu flag tắt.
 
+### 5.5.2. Nhận diện & chuẩn hoá file Excel import bằng AI (Claude)
+
+> ⚠️ **Feature flag riêng**: `AI_IMPORT_ENABLED` trong `.env` (mặc định `false`) + biến `ANTHROPIC_API_KEY`.
+> - `AI_IMPORT_ENABLED=false` → toàn bộ chức năng AI ẩn; API `/api/import/excel/ai-analyze` trả **403**; luồng import chạy 100% bằng parser tất định (mục 5.5).
+> - `AI_IMPORT_ENABLED=true` **và** có `ANTHROPIC_API_KEY` hợp lệ → nút "Phân tích bằng AI" xuất hiện ở bước preview.
+> - Cả 2 flag `IMPORT_EXCEL_ENABLED` và `AI_IMPORT_ENABLED` đều phải bật thì AI mới hoạt động (AI là phần mở rộng của Import Excel, không phải luồng độc lập).
+
+**Vấn đề giải quyết:** File Excel bảng tổng hợp điểm rèn luyện của trường **thay đổi theo từng năm học** — đổi tên cột (`Mã SV` ↔ `MSSV` ↔ `Mã sinh viên`), đổi tên sheet (`HỌC KỲ` ↔ `HK1` ↔ `Học kỳ I`), thêm/xoá/xê dịch cột, gộp ô tiêu đề khác vị trí, và **một số ô dữ liệu chưa chuẩn** (điểm ghi kèm chữ "đ", MSSV thiếu số 0 đầu, CCCD 11 số, họ tên và mã bị đảo cột…). Parser tất định (mục 5.5) bám header cố định dòng 7 nên dễ gãy khi format lệch.
+
+**Vai trò của AI (chỉ hỗ trợ, không quyết định):**
+1. **Ánh xạ cột (column mapping)**: đọc vài dòng đầu của sheet (header + 3–5 dòng mẫu), đề xuất cột nào ứng với `stt | cccd | maSV | hoTen | diem | ghiChu`, kèm độ tin cậy (0–1) mỗi ánh xạ.
+2. **Nhận diện sheet**: đoán sheet nào là "bảng điểm học kỳ" khi tên sheet khác mẫu.
+3. **Gắn cờ dữ liệu nghi ngờ (anomaly flags)** theo dòng: điểm ngoài 0–100 hoặc có ký tự lạ, MSSV sai regex `^[0-9]{3}[A-Z]{3}[0-9]{3}$`, CCCD ≠ 12 số, nghi đảo cột Họ tên/Mã, dòng có vẻ là tiêu đề/thống kê lẫn vào — mỗi cờ kèm `reason` (tiếng Việt) + `suggestedValue` (giá trị chuẩn hoá đề xuất, nếu có).
+
+**Ranh giới bắt buộc (an toàn dữ liệu):**
+- AI **chỉ đề xuất**; mọi thay đổi phải được CVHT **duyệt thủ công** trên bảng preview trước khi commit. Không có đường ghi thẳng từ AI vào DB.
+- **Xếp loại luôn recompute server-side** từ điểm (mục 6.1) — tuyệt đối không lấy xếp loại do AI/Excel cung cấp.
+- **Ưu tiên parser tất định**: nếu parser tất định đã map đủ cột và không có dòng lỗi → **không gọi AI** (tiết kiệm chi phí + không gửi dữ liệu ra ngoài). AI chỉ kích hoạt khi: parser không tìm thấy header chuẩn, thiếu cột bắt buộc, hoặc CVHT bấm nút "Phân tích bằng AI".
+- **Giá trị chuẩn hoá do AI đề xuất** (vd điểm `"85đ"` → `85`) phải qua lại validation Zod (integer 0–100…) ở server trước khi được chấp nhận.
+
+**Quyền riêng tư (BẮT BUỘC nêu rõ cho người dùng):**
+- Bật AI = **gửi dữ liệu file (header + các dòng SV: CCCD, MSSV, họ tên, điểm) tới Anthropic API** để phân tích. Đây là dịch vụ ngoài, chạy trên internet — khác với phần còn lại của app (offline/localhost).
+- Vì vậy flag mặc định **OFF**. UI phải hiện cảnh báo "Dữ liệu sẽ được gửi tới dịch vụ AI (Anthropic) để phân tích" và yêu cầu CVHT xác nhận (checkbox) trước lần chạy đầu.
+- Ghi audit log `action = AI_ANALYZE_IMPORT` kèm `{ filename, sheet, rowsAnalyzed }` (không log nội dung điểm chi tiết vào oldValue/newValue).
+
+**Kỹ thuật (chốt theo Tech Stack):**
+- SDK: `@anthropic-ai/sdk` (chính thức). Model mặc định `claude-opus-4-8`; cho phép cấu hình `AI_IMPORT_MODEL` để đổi sang model rẻ hơn (`claude-haiku-4-5`, `claude-sonnet-4-6`) tuỳ nhu cầu chi phí.
+- Dùng **Structured Outputs** để ép JSON đúng schema: gọi `client.messages.parse()` với `output_config: { format: { type: "json_schema", schema } }`. Không dùng prefill (đã bỏ trên các model 4.x).
+- Prompt đưa vào: tên các sheet, header dòng 1–7 và tối đa ~15 dòng dữ liệu mẫu (đủ để AI nhận diện, không gửi toàn bộ file nếu không cần). Với file > 200 dòng, chỉ gửi mẫu để lấy ánh xạ cột rồi áp ánh xạ đó cho toàn file bằng code tất định.
+- Server-side validate lại toàn bộ output AI bằng Zod (schema `AiImportAnalysisSchema`) trước khi trả về client — không tin cấu trúc trả về từ model.
+- Xử lý lỗi: hết quota/`ANTHROPIC_API_KEY` sai/timeout → trả thông báo tiếng Việt, tự động fallback về parser tất định (không chặn CVHT nhập tay).
+
+**Schema kết quả AI (server trả cho client, dạng preview):**
+```jsonc
+{
+  "sheetGuess": "HỌC KỲ",                 // sheet AI cho là bảng điểm HK
+  "columnMapping": {                       // index cột (0-based) + độ tin cậy
+    "stt":    { "col": 0, "confidence": 0.98 },
+    "cccd":   { "col": 1, "confidence": 0.95 },
+    "maSV":   { "col": 2, "confidence": 0.99 },
+    "hoTen":  { "col": 3, "confidence": 0.97 },
+    "diem":   { "col": 4, "confidence": 0.90 },
+    "ghiChu": { "col": 6, "confidence": 0.60 }
+  },
+  "rowAnomalies": [
+    { "row": 12, "field": "diem",  "value": "85đ",       "suggestedValue": "85",       "reason": "Điểm có ký tự thừa 'đ'" },
+    { "row": 15, "field": "maSV",  "value": "21CTT006",  "suggestedValue": "221CTT006","reason": "MSSV thiếu 1 số đầu so với regex" },
+    { "row": 20, "field": "cccd",  "value": "0123456789","suggestedValue": null,       "reason": "CCCD chỉ có 10 số, cần kiểm tra tay" }
+  ]
+}
+```
+
+**Flow người dùng (khi 2 flag bật):**
+1. CVHT chọn Năm học → Học kỳ → Lớp và upload file như mục 5.5.
+2. Parser tất định thử map trước. Nếu OK và không lỗi → preview bình thường (không gọi AI).
+3. Nếu map lỗi/thiếu cột, hoặc CVHT bấm "Phân tích bằng AI" → hiện cảnh báo quyền riêng tư → gọi `POST /api/import/excel/ai-analyze`.
+4. Client hiển thị: ánh xạ cột AI đề xuất (cho CVHT sửa lại combobox cột) + danh sách dòng nghi ngờ (mỗi dòng có nút "Áp giá trị đề xuất" / "Bỏ qua").
+5. CVHT duyệt → hệ thống dựng lại bảng theo ánh xạ đã chốt → **preview chuẩn của 5.5** (recompute xếp loại server-side) → commit.
+
+**API:**
+- `POST /api/import/excel/ai-analyze` (multipart hoặc JSON các dòng đã đọc) → trả `AiImportAnalysisSchema`. Trả **403** nếu `AI_IMPORT_ENABLED=false` hoặc thiếu `ANTHROPIC_API_KEY`. Trả 502 + thông báo tiếng Việt nếu gọi Anthropic thất bại.
+- `GET /api/config/features` bổ sung trường `{ aiImportEnabled: boolean }` để client ẩn/hiện nút.
+
 ### 5.6. Seed dữ liệu CLI (chạy 1 lần lúc cài đặt)
 
 **Mục đích:** đưa nhanh dữ liệu cũ từ file Excel có sẵn vào hệ thống. Đây là tool cho admin/dev, không có UI.
@@ -539,11 +603,12 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 | DB | SQLite (file `prisma/dev.db`) |
 | Auth | next-auth v5 (Credentials) |
 | Excel I/O | exceljs (đọc/ghi `.xlsx`), `xlsx` (fallback cho `.xls` cũ) |
+| AI nhận diện import | `@anthropic-ai/sdk` (Claude) — model mặc định `claude-opus-4-8`, cấu hình qua `AI_IMPORT_MODEL`; dùng Structured Outputs (`messages.parse` + `output_config.format`) |
 | Charts | recharts |
 | Bcrypt | bcryptjs |
 | Notification | sonner |
 | Testing | vitest + playwright (smoke test) |
-| Feature flag | biến môi trường `.env` |
+| Feature flag | biến môi trường `.env` (`IMPORT_EXCEL_ENABLED`, `AI_IMPORT_ENABLED`) |
 
 ---
 
@@ -619,6 +684,12 @@ NEXTAUTH_URL="http://localhost:3000"
 
 # Feature flags
 IMPORT_EXCEL_ENABLED=false
+
+# AI nhận diện file Excel import (mục 5.5.2) — mặc định OFF
+# Bật = gửi dữ liệu file tới Anthropic API để phân tích (dịch vụ ngoài)
+AI_IMPORT_ENABLED=false
+ANTHROPIC_API_KEY=""
+AI_IMPORT_MODEL="claude-opus-4-8"   # có thể đổi: claude-haiku-4-5 | claude-sonnet-4-6
 ```
 
 ---
@@ -631,6 +702,8 @@ PRD được coi là hoàn thành khi:
 - [ ] Admin thêm được 1 Năm học mới (vd `2026-2027`) và 2 Học kỳ (HK1, HK2) trong Quản lý danh mục; không tạo được HK trùng `number` trong cùng năm học (báo lỗi).
 - [ ] Sau khi chọn Năm học → Học kỳ → Lớp, CVHT nhập được điểm cho từng SV; combobox HK chỉ hiện HK thuộc năm học đã chọn.
 - [ ] Khi flag bật: import *Bảng tổng hợp điểm HK theo lớp* vào đúng Lớp/HK/Năm học đã chọn; preview hiển thị dòng "sẽ ghi đè" khi SV đã có điểm; xếp loại được recompute server-side, không lấy từ cột Excel.
+- [ ] Khi `AI_IMPORT_ENABLED=false` (hoặc thiếu `ANTHROPIC_API_KEY`): nút "Phân tích bằng AI" ẨN; gọi trực tiếp `/api/import/excel/ai-analyze` trả **403**; import vẫn chạy được bằng parser tất định.
+- [ ] Khi `AI_IMPORT_ENABLED=true`: với file đổi tên cột/sheet, AI đề xuất ánh xạ cột + gắn cờ dòng nghi ngờ (điểm có ký tự lạ, MSSV sai regex); CVHT duyệt trước khi commit; xếp loại vẫn recompute server-side (không lấy từ AI); có cảnh báo quyền riêng tư trước lần chạy đầu và audit log `AI_ANALYZE_IMPORT`.
 - [ ] CVHT đăng nhập, thấy đúng lớp được gán, không thấy lớp khác.
 - [ ] Chạy `npm run seed:excel -- --file=./sample/DC22CTT01-II-25-26.xls` thành công → 14 SV + điểm các HK đã trong DB.
 - [ ] CVHT thêm 1 điểm mới qua Mode A (Dialog) → xếp loại auto đúng.
@@ -654,7 +727,7 @@ PRD được coi là hoàn thành khi:
 | 1 | Init project, Prisma schema, migration, seed admin, layout cơ bản, auth, **feature flag system** |
 | 2 | CRUD danh mục (Khoa/Khóa/Lớp/SV/HK/Năm học/User) |
 | 3 | Logic xếp loại + Nhập điểm Mode A (Dialog) + Mode B (inline) + CLI seed Excel + Audit log |
-| 4 | Export Excel theo mẫu (4 loại) + Import Excel (sau feature flag) |
+| 4 | Export Excel theo mẫu (4 loại) + Import Excel (sau feature flag) + AI nhận diện file import (mục 5.5.2, sau flag `AI_IMPORT_ENABLED`) |
 | 5 | Tra cứu + Thống kê + Biểu đồ |
 | 6 | Polish UX, Backup, Test E2E, viết README |
 
