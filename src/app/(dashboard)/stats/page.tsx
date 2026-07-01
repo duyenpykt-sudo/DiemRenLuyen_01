@@ -19,6 +19,7 @@ import {
 } from "recharts";
 
 import { http } from "@/lib/http";
+import { useSessionRole } from "@/hooks/use-session-role";
 import { CLASSIFICATION_LABEL } from "@/lib/classification";
 import { CLASS_ORDER } from "@/lib/stats";
 import type { Classification } from "@/lib/enums";
@@ -53,14 +54,7 @@ type Trend = { label: string; avg: number | null }[];
 const FAC_CATS: Classification[] = ["XUAT_SAC", "TOT", "KHA", "TRUNG_BINH", "YEU", "KEM"];
 
 export default function StatsPage() {
-  const { data: session } = useQuery({
-    queryKey: ["session"],
-    queryFn: async () => {
-      const r = await fetch("/api/auth/session");
-      return (await r.json()) as { user?: { role?: string } };
-    },
-  });
-  const role = session?.user?.role;
+  const role = useSessionRole();
   const canFaculty = role === "ADMIN" || role === "TRUONG_KHOA";
 
   const { data: classes = [] } = useQuery({

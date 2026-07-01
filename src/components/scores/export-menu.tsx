@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 
+import { useSessionRole } from "@/hooks/use-session-role";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -34,14 +34,7 @@ export function ExportMenu({
   cohortId: string;
 }) {
   // Lấy vai trò để quyết định hiển thị mục "Tổng hợp khoa".
-  const { data: session } = useQuery({
-    queryKey: ["session"],
-    queryFn: async () => {
-      const res = await fetch("/api/auth/session");
-      return (await res.json()) as { user?: { role?: string } };
-    },
-  });
-  const role = session?.user?.role;
+  const role = useSessionRole();
   const canFacultySummary = role === "ADMIN" || role === "TRUONG_KHOA";
 
   const base = "/api/export/excel";
