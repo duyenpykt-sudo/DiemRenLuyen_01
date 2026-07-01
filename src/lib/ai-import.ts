@@ -144,7 +144,7 @@ export async function analyzeExcelWithAI(
 ): Promise<AiImportAnalysis> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("Thiếu GEMINI_API_KEY.");
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
 
   const ai = new GoogleGenAI({ apiKey });
   const userPayload = JSON.stringify(

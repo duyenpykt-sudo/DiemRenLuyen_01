@@ -385,7 +385,7 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - Ghi audit log `action = AI_ANALYZE_IMPORT` kèm `{ filename, sheet, rowsAnalyzed }` (không log nội dung điểm chi tiết vào oldValue/newValue).
 
 **Kỹ thuật (chốt theo Tech Stack):**
-- SDK: `@google/genai` (Google GenAI SDK chính thức). Model mặc định `gemini-2.5-flash` (rẻ, nhanh, đủ cho tác vụ nhận diện cấu trúc); cho phép cấu hình `GEMINI_MODEL` để đổi sang model mạnh hơn (`gemini-2.5-pro`) hoặc model mới hơn tuỳ nhu cầu.
+- SDK: `@google/genai` (Google GenAI SDK chính thức). Model mặc định `gemini-3.5-flash` (rẻ, nhanh, đủ cho tác vụ nhận diện cấu trúc); cho phép cấu hình `GEMINI_MODEL` để đổi sang model mạnh hơn tuỳ nhu cầu.
 - Dùng **Structured Output** của Gemini để ép JSON đúng schema: cấu hình `responseMimeType: "application/json"` + `responseSchema` (JSON schema tương ứng `AiImportAnalysisSchema`). **KHÔNG** parse thủ công text tự do.
 - Prompt đưa vào: tên các sheet, header dòng 1–7 và tối đa ~15 dòng dữ liệu mẫu (đủ để AI nhận diện, không gửi toàn bộ file nếu không cần). Với file > 200 dòng, chỉ gửi mẫu để lấy ánh xạ cột rồi áp ánh xạ đó cho toàn file bằng code tất định.
 - Server-side validate lại toàn bộ output AI bằng Zod (schema `AiImportAnalysisSchema`) trước khi trả về client — không tin cấu trúc trả về từ model dù đã khai báo `responseSchema`.
@@ -603,7 +603,7 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 | DB | SQLite (file `prisma/dev.db`) |
 | Auth | next-auth v5 (Credentials) |
 | Excel I/O | exceljs (đọc/ghi `.xlsx`), `xlsx` (fallback cho `.xls` cũ) |
-| AI nhận diện import | `@google/genai` (Google Gemini) — model mặc định `gemini-2.5-flash`, cấu hình qua `GEMINI_MODEL`; dùng Structured Output (`responseMimeType: application/json` + `responseSchema`) |
+| AI nhận diện import | `@google/genai` (Google Gemini) — model mặc định `gemini-3.5-flash`, cấu hình qua `GEMINI_MODEL`; dùng Structured Output (`responseMimeType: application/json` + `responseSchema`) |
 | Charts | recharts |
 | Bcrypt | bcryptjs |
 | Notification | sonner |
@@ -689,7 +689,7 @@ IMPORT_EXCEL_ENABLED=false
 # Bật = gửi dữ liệu file tới Google Gemini API để phân tích (dịch vụ ngoài)
 AI_IMPORT_ENABLED=false
 GEMINI_API_KEY=""
-GEMINI_MODEL="gemini-2.5-flash"   # có thể đổi: gemini-2.5-pro
+GEMINI_MODEL="gemini-3.5-flash"   # có thể đổi sang model mạnh hơn
 ```
 
 ---

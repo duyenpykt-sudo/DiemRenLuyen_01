@@ -437,8 +437,8 @@ file Excel import bằng Google Gemini, đứng sau feature flag AI_IMPORT_ENABL
 CHỈ hoạt động khi CẢ IMPORT_EXCEL_ENABLED và AI_IMPORT_ENABLED đều bật.
 
 Kỹ thuật (bám Tech Stack đã chốt):
-1. Dùng SDK CHÍNH THỨC @google/genai (Google GenAI SDK). Model mặc định "gemini-2.5-flash",
-   đọc từ env GEMINI_MODEL (cho phép gemini-2.5-pro). Khởi tạo client bằng GEMINI_API_KEY.
+1. Dùng SDK CHÍNH THỨC @google/genai (Google GenAI SDK). Model mặc định "gemini-3.5-flash",
+   đọc từ env GEMINI_MODEL (cho phép đổi sang model mạnh hơn). Khởi tạo client bằng GEMINI_API_KEY.
 2. Ép JSON bằng Structured Output của Gemini: config responseMimeType: "application/json"
    + responseSchema (JSON schema tương ứng AiImportAnalysisSchema). KHÔNG parse text tự do.
 3. lib/features.ts thêm: aiImport = AI_IMPORT_ENABLED === 'true' && !!GEMINI_API_KEY.
