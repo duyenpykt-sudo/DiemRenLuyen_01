@@ -22,6 +22,8 @@ export type SemesterRow = {
   number: number;
   name: string;
   isLocked: boolean;
+  // Số bản ghi điểm đang gắn với học kỳ này (mục 5.3.1).
+  _count?: { conductScores: number };
 };
 
 export type AcademicYearRow = {

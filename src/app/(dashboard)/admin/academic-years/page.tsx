@@ -54,6 +54,18 @@ export default function AcademicYearsPage() {
     }
   }, [open, editing, form]);
 
+  // Tự điền Năm kết thúc + Tên khi nhập Năm bắt đầu (chỉ khi thêm mới) — mục 5.3.1.
+  // Vẫn cho sửa tay sau đó.
+  const startYear = form.watch("startYear");
+  useEffect(() => {
+    if (!open || editing) return;
+    const sy = Number(startYear);
+    if (Number.isInteger(sy) && sy >= 2000 && sy <= 2100) {
+      form.setValue("endYear", sy + 1);
+      form.setValue("name", `${sy}-${sy + 1}`);
+    }
+  }, [startYear, open, editing, form]);
+
   const save = useMutation({
     mutationFn: (values: AcademicYearInput) =>
       editing
@@ -105,6 +117,8 @@ export default function AcademicYearsPage() {
               <Badge variant={s.isLocked ? "secondary" : "outline"}>
                 {s.name}
                 {s.isLocked && " · đã chốt"}
+                {typeof s._count?.conductScores === "number" &&
+                  ` · ${s._count.conductScores} điểm`}
               </Badge>
               <Button
                 variant="ghost"
