@@ -35,6 +35,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+type Action = "create" | "overwrite" | "skip";
+type MatchStatus = "matched" | "not_in_target_class" | "not_in_db";
+
 type PreviewRow = {
   row: number;
   maSV: string;
@@ -42,12 +45,17 @@ type PreviewRow = {
   hoTen: string;
   diem: string;
   note: string;
-  matched: boolean;
+  matchStatus: MatchStatus;
+  action: Action;
   studentId: string | null;
   studentName: string | null;
   score: number | null;
+  existingScore: number | null;
   error: string | null;
 };
+
+const isActionable = (r: PreviewRow) =>
+  r.action === "create" || r.action === "overwrite";
 
 // Nhãn tiếng Việt cho các trường ánh xạ cột.
 const FIELD_LABELS: Record<keyof AiImportAnalysis["columnMapping"], string> = {
@@ -93,6 +101,8 @@ export function ImportExcelButton({
   const [file, setFile] = useState<File | null>(null);
   const [sheetName, setSheetName] = useState("HỌC KỲ");
   const [rows, setRows] = useState<PreviewRow[]>([]);
+  // Dòng nào được chọn ghi vào DB. Mặc định: create=chọn, overwrite=KHÔNG chọn.
+  const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(false);
 
   // ── Trạng thái AI (mục 5.5.2) ──────────────────────────────────────────────
@@ -108,22 +118,39 @@ export function ImportExcelButton({
     setStep(1);
     setFile(null);
     setRows([]);
+    setSelected({});
     setAnalysis(null);
     setApplied({});
   }
 
-  // Áp override (giá trị AI đề xuất) lên các dòng preview + tính lại score/error client-side.
-  function applyOverrides(list: PreviewRow[]): PreviewRow[] {
-    return list.map((r) => {
-      const v = applied[r.row];
-      if (v == null) return r;
-      const score = Number(v);
-      const valid = Number.isInteger(score) && score >= 0 && score <= 100;
-      let error: string | null = null;
-      if (!r.matched) error = "Không tìm thấy SV trong lớp (theo MSSV/CCCD)";
-      else if (!valid) error = "Điểm không hợp lệ (0–100)";
-      return { ...r, diem: v, score: valid ? score : null, error };
-    });
+  // Áp override (giá trị AI đề xuất) + tính lại action/score/error client-side.
+  function recomputeRow(r: PreviewRow): PreviewRow {
+    const v = applied[r.row];
+    if (v == null) return r;
+    if (r.matchStatus !== "matched") return { ...r, diem: v };
+    const score = Number(v);
+    const valid = Number.isInteger(score) && score >= 0 && score <= 100;
+    if (!valid) {
+      return { ...r, diem: v, score: null, action: "skip", error: "Điểm không hợp lệ (0–100)" };
+    }
+    return {
+      ...r,
+      diem: v,
+      score,
+      error: null,
+      action: r.existingScore != null ? "overwrite" : "create",
+    };
+  }
+
+  // Mặc định chọn: create → true; overwrite → chỉ chọn nếu vừa sửa qua AI; skip → false.
+  function defaultSelected(list: PreviewRow[]): Record<number, boolean> {
+    const s: Record<number, boolean> = {};
+    for (const r of list) {
+      if (r.action === "create") s[r.row] = true;
+      else if (r.action === "overwrite") s[r.row] = applied[r.row] != null;
+      else s[r.row] = false;
+    }
+    return s;
   }
 
   async function doPreview(mapping?: ColumnMapping, sheet?: string) {
@@ -133,6 +160,7 @@ export function ImportExcelButton({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("classId", classId);
+      fd.append("semesterId", semesterId);
       fd.append("sheetName", sheet ?? sheetName);
       if (mapping) fd.append("columnMapping", JSON.stringify(mapping));
       const res = await fetch("/api/import/excel/preview", {
@@ -141,7 +169,9 @@ export function ImportExcelButton({
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error ?? "Lỗi đọc file");
-      setRows(applyOverrides(json.data.rows));
+      const baked = (json.data.rows as PreviewRow[]).map(recomputeRow);
+      setRows(baked);
+      setSelected(defaultSelected(baked));
       setStep(2);
     } catch (e) {
       toast.error((e as Error).message);
@@ -178,15 +208,31 @@ export function ImportExcelButton({
     toast.success(`Đã áp giá trị đề xuất cho dòng ${row}`);
   }
 
+  function toggleRow(row: number) {
+    setSelected((prev) => ({ ...prev, [row]: !prev[row] }));
+  }
+
+  // Chọn/bỏ tất cả dòng ghi đè (tiện lợi — mặc định các dòng này KHÔNG chọn).
+  function setAllOverwrite(value: boolean) {
+    setSelected((prev) => {
+      const next = { ...prev };
+      for (const r of rows) if (r.action === "overwrite") next[r.row] = value;
+      return next;
+    });
+  }
+
   async function doCommit() {
     const items = rows
-      .filter((r) => r.matched && r.score != null && !r.error)
+      .filter(
+        (r) => selected[r.row] && isActionable(r) && r.score != null && !r.error
+      )
       .map((r) => ({ maSV: r.maSV, cccd: r.cccd, score: r.score, note: r.note }));
-    if (items.length === 0) return toast.error("Không có dòng hợp lệ để ghi");
+    if (items.length === 0) return toast.error("Không có dòng nào được chọn để ghi");
     setLoading(true);
     try {
       const result = await http.post<{
-        rowsSuccess: number;
+        rowsCreated: number;
+        rowsOverwritten: number;
         rowsFailed: number;
       }>("/api/import/excel/commit", {
         classId,
@@ -195,7 +241,8 @@ export function ImportExcelButton({
         items,
       });
       toast.success(
-        `Đã import: ${result.rowsSuccess} thành công, ${result.rowsFailed} lỗi`
+        `Đã import: ${result.rowsCreated} tạo mới, ${result.rowsOverwritten} ghi đè` +
+          (result.rowsFailed ? `, ${result.rowsFailed} lỗi` : "")
       );
       setOpen(false);
       reset();
@@ -207,7 +254,12 @@ export function ImportExcelButton({
     }
   }
 
-  const validCount = rows.filter((r) => r.matched && r.score != null && !r.error).length;
+  const createCount = rows.filter((r) => r.action === "create").length;
+  const overwriteCount = rows.filter((r) => r.action === "overwrite").length;
+  const skipCount = rows.filter((r) => r.action === "skip").length;
+  const selectedCount = rows.filter(
+    (r) => selected[r.row] && isActionable(r) && r.score != null && !r.error
+  ).length;
 
   return (
     <>
@@ -387,18 +439,49 @@ export function ImportExcelButton({
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                {validCount}/{rows.length} dòng hợp lệ sẽ được ghi. Dòng lỗi (đỏ) sẽ bỏ qua.
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <span className="text-green-700 dark:text-green-400">
+                  Tạo mới: {createCount}
+                </span>
+                <span className="text-amber-700 dark:text-amber-500">
+                  Ghi đè: {overwriteCount}
+                </span>
+                <span className="text-muted-foreground">Bỏ qua: {skipCount}</span>
+                {overwriteCount > 0 && (
+                  <span className="ml-auto flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAllOverwrite(true)}
+                    >
+                      Chọn hết ghi đè
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setAllOverwrite(false)}
+                    >
+                      Bỏ hết ghi đè
+                    </Button>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Dòng &ldquo;ghi đè&rdquo; mặc định KHÔNG chọn — tick để cập nhật điểm đã có.
+                Xếp loại được tính lại ở máy chủ khi ghi.
               </p>
               <div className="max-h-80 overflow-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10"></TableHead>
                       <TableHead>#</TableHead>
                       <TableHead>MSSV</TableHead>
                       <TableHead>Họ tên (file)</TableHead>
                       <TableHead>Điểm</TableHead>
-                      <TableHead>Kết quả</TableHead>
+                      <TableHead>Trạng thái</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -406,19 +489,37 @@ export function ImportExcelButton({
                       <TableRow
                         key={r.row}
                         className={cn(
-                          r.error ? "bg-destructive/10" : "bg-green-500/10"
+                          r.action === "create" && "bg-green-500/10",
+                          r.action === "overwrite" && "bg-amber-500/10",
+                          r.action === "skip" && "bg-muted/40"
                         )}
                       >
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            checked={!!selected[r.row]}
+                            disabled={!isActionable(r) || r.score == null || !!r.error}
+                            onChange={() => toggleRow(r.row)}
+                          />
+                        </TableCell>
                         <TableCell>{r.row}</TableCell>
                         <TableCell className="font-medium">{r.maSV}</TableCell>
                         <TableCell>{r.hoTen}</TableCell>
                         <TableCell>{r.diem}</TableCell>
                         <TableCell className="text-sm">
-                          {r.error ? (
-                            <span className="text-destructive">{r.error}</span>
-                          ) : (
+                          {r.action === "create" && (
                             <span className="text-green-700 dark:text-green-400">
-                              Khớp: {r.studentName}
+                              Tạo mới: {r.studentName}
+                            </span>
+                          )}
+                          {r.action === "overwrite" && (
+                            <span className="text-amber-700 dark:text-amber-500">
+                              Ghi đè {r.existingScore} → {r.score}: {r.studentName}
+                            </span>
+                          )}
+                          {r.action === "skip" && (
+                            <span className="text-muted-foreground">
+                              {r.error ?? "Bỏ qua"}
                             </span>
                           )}
                         </TableCell>
@@ -442,9 +543,9 @@ export function ImportExcelButton({
                 Xem trước
               </Button>
             ) : (
-              <Button onClick={doCommit} disabled={loading || validCount === 0}>
+              <Button onClick={doCommit} disabled={loading || selectedCount === 0}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Xác nhận ghi {validCount} dòng
+                Xác nhận ghi {selectedCount} dòng
               </Button>
             )}
           </DialogFooter>
