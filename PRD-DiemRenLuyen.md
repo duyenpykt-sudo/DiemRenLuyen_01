@@ -1,6 +1,6 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.4  
+**Phiên bản:** 1.5  
 **Ngày:** 01/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
@@ -9,7 +9,8 @@
 > - v1.1: tạm cắt 2 tính năng trên khỏi MVP.
 > - v1.2: khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.
 > - v1.3: làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).
-> - **v1.4 (hiện tại): thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.**
+> - v1.4: thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.
+> - **v1.5 (hiện tại): trình bày rõ *Import Excel là phương thức nhập điểm thứ 3* ngay trong chức năng Điểm rèn luyện (mục 5.4) — bên cạnh 2 mode nhập tay; nút "Import Excel" trên `/scores`, ghi vào đúng Lớp × Học kỳ × Năm học đang chọn, có preview ghi-đè có kiểm soát (tham chiếu mục 5.5 / 5.5.2).**
 
 ---
 
@@ -324,6 +325,20 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - Mỗi mutation ghi audit log với `oldValue`/`newValue` (JSON).
 - Validation: điểm là integer 0-100; mỗi SV chỉ có 1 record cho 1 HK.
 - Server-side recompute xếp loại trước khi lưu (không tin client).
+
+#### Nhập điểm bằng Import Excel (phương thức thứ 3, ngoài 2 mode thủ công)
+
+Ngoài nhập tay (Mode A/B), chức năng **Điểm rèn luyện** còn cho phép **nhập hàng loạt bằng Import Excel** từ *Bảng tổng hợp điểm rèn luyện học kỳ theo lớp*:
+
+- Nút **"Import Excel"** hiển thị ngay trên trang `/scores`, chỉ khi:
+  - `IMPORT_EXCEL_ENABLED=true` (feature flag), **và**
+  - CVHT có quyền sửa lớp đang chọn, **và** Học kỳ chưa chốt (`isLocked=false`).
+- Import ghi vào đúng **Lớp × Học kỳ × Năm học** đang chọn ở bộ lọc 3 chiều (mục 5.4) — không cần chọn lại đích.
+- Preview đối chiếu từng dòng với `matchStatus` (matched / not_in_target_class / not_in_db) và `action` (create / overwrite / skip); dòng **"ghi đè"** mặc định **KHÔNG** chọn, CVHT tick mới cập nhật điểm đã có.
+- (Tùy chọn) **Phân tích bằng AI (Google Gemini)** để nhận diện cột & chuẩn hoá dữ liệu khi file đổi định dạng theo năm — mục 5.5.2.
+- **Xếp loại luôn recompute server-side** khi ghi; audit log `IMPORT_EXCEL` kèm số dòng tạo mới/ghi đè/lỗi.
+
+> Chi tiết luồng upload → preview → commit, quy tắc parse (header dòng 7, dừng ở "THỐNG KÊ"…), ghi đè có kiểm soát và feature flag: **xem mục 5.5** (và 5.5.2 cho phần AI).
 
 ### 5.5. Import Excel (có feature flag)
 
