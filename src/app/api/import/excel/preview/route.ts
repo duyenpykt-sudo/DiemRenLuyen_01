@@ -3,7 +3,11 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireRole } from "@/lib/guard";
 import { getClassPermission } from "@/lib/scores-access";
 import { features } from "@/lib/features";
-import { parseHocKyBuffer } from "@/lib/excel-import";
+import {
+  parseHocKyBuffer,
+  parseHocKyBufferWithMapping,
+  type ColumnMapping,
+} from "@/lib/excel-import";
 
 // POST /api/import/excel/preview — parse + đối chiếu, KHÔNG ghi DB.
 export async function POST(req: Request) {
@@ -19,6 +23,16 @@ export async function POST(req: Request) {
   const file = form.get("file");
   const classId = String(form.get("classId") ?? "");
   const sheetName = String(form.get("sheetName") ?? "HỌC KỲ");
+  // Ánh xạ cột do AI đề xuất + CVHT duyệt (mục 5.5.2). Nếu không có → parser tất định.
+  const mappingRaw = form.get("columnMapping");
+  let mapping: ColumnMapping | null = null;
+  if (typeof mappingRaw === "string" && mappingRaw.trim()) {
+    try {
+      mapping = JSON.parse(mappingRaw) as ColumnMapping;
+    } catch {
+      return apiError("Ánh xạ cột không hợp lệ.", 400);
+    }
+  }
   if (!(file instanceof File)) return apiError("Thiếu file.", 400);
   if (file.size > 5 * 1024 * 1024) {
     return apiError("File vượt quá 5MB.", 400);
@@ -32,7 +46,9 @@ export async function POST(req: Request) {
   let parsed;
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    parsed = parseHocKyBuffer(buffer, sheetName);
+    parsed = mapping
+      ? parseHocKyBufferWithMapping(buffer, sheetName, mapping)
+      : parseHocKyBuffer(buffer, sheetName);
   } catch (e) {
     return apiError((e as Error).message, 400);
   }
