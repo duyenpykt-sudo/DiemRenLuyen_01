@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireRole } from "@/lib/guard";
@@ -8,6 +9,17 @@ import {
   parseHocKyBufferWithMapping,
   type ColumnMapping,
 } from "@/lib/excel-import";
+
+// Chỉnh sửa do CVHT duyệt từ đề xuất AI (mục 5.5.2): áp giá trị chuẩn hoá vào
+// đúng dòng/trường TRƯỚC khi đối chiếu, để việc match SV + validate điểm đều
+// chạy lại server-side (không tin giá trị AI nếu chưa qua bước này).
+const overridesSchema = z.array(
+  z.object({
+    row: z.number().int().positive(),
+    field: z.enum(["cccd", "maSV", "hoTen", "diem", "ghiChu"]),
+    value: z.string(),
+  })
+);
 
 // POST /api/import/excel/preview — parse + đối chiếu, KHÔNG ghi DB (mục 5.5).
 export async function POST(req: Request) {
@@ -34,6 +46,20 @@ export async function POST(req: Request) {
       return apiError("Ánh xạ cột không hợp lệ.", 400);
     }
   }
+  // Giá trị AI đề xuất đã được CVHT duyệt (nếu có).
+  const overridesRaw = form.get("overrides");
+  let overrides: z.infer<typeof overridesSchema> = [];
+  if (typeof overridesRaw === "string" && overridesRaw.trim()) {
+    let arr: unknown;
+    try {
+      arr = JSON.parse(overridesRaw);
+    } catch {
+      return apiError("Danh sách chỉnh sửa không hợp lệ.", 400);
+    }
+    const ov = overridesSchema.safeParse(arr);
+    if (!ov.success) return apiError("Danh sách chỉnh sửa không hợp lệ.", 400);
+    overrides = ov.data;
+  }
   if (!(file instanceof File)) return apiError("Thiếu file.", 400);
   if (!semesterId) return apiError("Thiếu học kỳ đích.", 400);
   if (file.size > 5 * 1024 * 1024) {
@@ -53,6 +79,14 @@ export async function POST(req: Request) {
       : parseHocKyBuffer(buffer, sheetName);
   } catch (e) {
     return apiError((e as Error).message, 400);
+  }
+
+  // Áp giá trị CVHT đã duyệt (row 1-based = thứ tự dòng dữ liệu trong preview)
+  // TRƯỚC khi đối chiếu, để maSV/cccd sửa lại được re-match, điểm sửa lại được
+  // validate. Bỏ qua override trỏ ngoài phạm vi.
+  for (const o of overrides) {
+    const target = parsed[o.row - 1];
+    if (target) target[o.field] = o.value;
   }
 
   // SV thuộc lớp đích.

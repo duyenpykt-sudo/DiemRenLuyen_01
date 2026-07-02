@@ -2,7 +2,11 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireRole } from "@/lib/guard";
 import { getClassPermission } from "@/lib/scores-access";
 import { features } from "@/lib/features";
-import { buildSheetSamples, analyzeExcelWithAI } from "@/lib/ai-import";
+import {
+  buildSheetSamples,
+  analyzeExcelWithAI,
+  columnHeaderLabels,
+} from "@/lib/ai-import";
 import { writeAudit } from "@/lib/audit";
 
 // Đọc env lúc chạy để flag có hiệu lực ngay sau khi đổi .env + restart.
@@ -54,6 +58,10 @@ export async function POST(req: Request) {
     );
   }
 
+  // Nhãn cột của sheet AI đoán → giúp CVHT chỉnh ánh xạ trên combobox.
+  const guessed = samples.find((s) => s.sheetName === analysis.sheetGuess);
+  const columnHeaders = guessed ? columnHeaderLabels(guessed) : [];
+
   // Audit log — KHÔNG log nội dung điểm chi tiết.
   await writeAudit({
     userId: g.session.user.id,
@@ -63,11 +71,10 @@ export async function POST(req: Request) {
     newValue: {
       filename: file.name,
       sheet: analysis.sheetGuess,
-      rowsAnalyzed: samples.find((s) => s.sheetName === analysis.sheetGuess)
-        ?.dataRows.length ?? 0,
+      rowsAnalyzed: guessed?.dataRows.length ?? 0,
     },
     req,
   });
 
-  return apiOk(analysis);
+  return apiOk({ ...analysis, columnHeaders });
 }

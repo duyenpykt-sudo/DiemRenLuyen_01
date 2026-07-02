@@ -54,11 +54,18 @@ type PreviewRow = {
   error: string | null;
 };
 
+// Kết quả từ /api/import/excel/ai-analyze: analysis + nhãn cột (dựng UI combobox).
+type AiAnalyzeResult = AiImportAnalysis & { columnHeaders?: string[] };
+
+type MappingField = keyof AiImportAnalysis["columnMapping"];
+// Trường có thể chỉnh giá trị (áp đề xuất). STT không ghi vào DB nên không cho áp.
+type OverrideField = "cccd" | "maSV" | "hoTen" | "diem" | "ghiChu";
+
 const isActionable = (r: PreviewRow) =>
   r.action === "create" || r.action === "overwrite";
 
 // Nhãn tiếng Việt cho các trường ánh xạ cột.
-const FIELD_LABELS: Record<keyof AiImportAnalysis["columnMapping"], string> = {
+const FIELD_LABELS: Record<MappingField, string> = {
   stt: "STT",
   cccd: "CCCD",
   maSV: "Mã SV",
@@ -66,7 +73,17 @@ const FIELD_LABELS: Record<keyof AiImportAnalysis["columnMapping"], string> = {
   diem: "Điểm",
   ghiChu: "Ghi chú",
 };
-const FIELD_ORDER = ["stt", "cccd", "maSV", "hoTen", "diem", "ghiChu"] as const;
+const FIELD_ORDER: MappingField[] = [
+  "stt",
+  "cccd",
+  "maSV",
+  "hoTen",
+  "diem",
+  "ghiChu",
+];
+
+const NO_COLUMN = "none"; // sentinel cho combobox "không có cột"
+const MAX_COLS = 12; // fallback khi chưa có nhãn cột từ server
 
 /** Chuyển ánh xạ AI ({col,confidence}|null) → ColumnMapping ({field: colIndex}). */
 function toColumnMapping(m: AiImportAnalysis["columnMapping"]): ColumnMapping {
@@ -108,9 +125,13 @@ export function ImportExcelButton({
   // ── Trạng thái AI (mục 5.5.2) ──────────────────────────────────────────────
   const [aiConsent, setAiConsent] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<AiImportAnalysis | null>(null);
-  // Các dòng "diem" mà CVHT đã chấp nhận áp giá trị AI đề xuất: { row: value }.
-  const [applied, setApplied] = useState<Record<number, string>>({});
+  const [analysis, setAnalysis] = useState<AiAnalyzeResult | null>(null);
+  // Ánh xạ cột do CVHT duyệt (khởi tạo từ AI, chỉnh được qua combobox).
+  const [editMapping, setEditMapping] = useState<ColumnMapping>({});
+  // Giá trị AI đề xuất mà CVHT đã áp: key `${row}:${field}` → value.
+  const [applied, setApplied] = useState<Record<string, string>>({});
+  // Dòng nghi ngờ CVHT đã bỏ qua: key `${row}:${field}` → true.
+  const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
 
   if (!cfg?.importExcelEnabled) return null;
 
@@ -120,37 +141,24 @@ export function ImportExcelButton({
     setRows([]);
     setSelected({});
     setAnalysis(null);
+    setEditMapping({});
     setApplied({});
+    setDismissed({});
   }
 
-  // Áp override (giá trị AI đề xuất) + tính lại action/score/error client-side.
-  function recomputeRow(r: PreviewRow): PreviewRow {
-    const v = applied[r.row];
-    if (v == null) return r;
-    if (r.matchStatus !== "matched") return { ...r, diem: v };
-    const score = Number(v);
-    const valid = Number.isInteger(score) && score >= 0 && score <= 100;
-    if (!valid) {
-      return { ...r, diem: v, score: null, action: "skip", error: "Điểm không hợp lệ (0–100)" };
-    }
-    return {
-      ...r,
-      diem: v,
-      score,
-      error: null,
-      action: r.existingScore != null ? "overwrite" : "create",
-    };
-  }
-
-  // Mặc định chọn: create → true; overwrite → chỉ chọn nếu vừa sửa qua AI; skip → false.
+  // Mặc định chọn: create → true; overwrite → KHÔNG (CVHT tick để ghi đè); skip → false.
   function defaultSelected(list: PreviewRow[]): Record<number, boolean> {
     const s: Record<number, boolean> = {};
-    for (const r of list) {
-      if (r.action === "create") s[r.row] = true;
-      else if (r.action === "overwrite") s[r.row] = applied[r.row] != null;
-      else s[r.row] = false;
-    }
+    for (const r of list) s[r.row] = r.action === "create";
     return s;
+  }
+
+  // Gom các giá trị AI đã được CVHT duyệt → gửi kèm preview để server áp trước match.
+  function collectOverrides() {
+    return Object.entries(applied).map(([key, value]) => {
+      const [row, field] = key.split(":");
+      return { row: Number(row), field: field as OverrideField, value };
+    });
   }
 
   async function doPreview(mapping?: ColumnMapping, sheet?: string) {
@@ -163,13 +171,15 @@ export function ImportExcelButton({
       fd.append("semesterId", semesterId);
       fd.append("sheetName", sheet ?? sheetName);
       if (mapping) fd.append("columnMapping", JSON.stringify(mapping));
+      const overrides = collectOverrides();
+      if (overrides.length) fd.append("overrides", JSON.stringify(overrides));
       const res = await fetch("/api/import/excel/preview", {
         method: "POST",
         body: fd,
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error ?? "Lỗi đọc file");
-      const baked = (json.data.rows as PreviewRow[]).map(recomputeRow);
+      const baked = json.data.rows as PreviewRow[];
       setRows(baked);
       setSelected(defaultSelected(baked));
       setStep(2);
@@ -194,8 +204,12 @@ export function ImportExcelButton({
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error ?? "Lỗi phân tích AI");
-      setAnalysis(json.data as AiImportAnalysis);
-      toast.success("AI đã phân tích xong. Vui lòng kiểm tra đề xuất.");
+      const result = json.data as AiAnalyzeResult;
+      setAnalysis(result);
+      setEditMapping(toColumnMapping(result.columnMapping));
+      setApplied({});
+      setDismissed({});
+      toast.success("AI đã phân tích xong. Vui lòng kiểm tra & chỉnh đề xuất.");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -203,9 +217,44 @@ export function ImportExcelButton({
     }
   }
 
-  function acceptSuggestion(row: number, value: string) {
-    setApplied((prev) => ({ ...prev, [row]: value }));
-    toast.success(`Đã áp giá trị đề xuất cho dòng ${row}`);
+  // Chỉnh ánh xạ 1 cột qua combobox.
+  function setMappingField(field: MappingField, colStr: string) {
+    setEditMapping((prev) => {
+      const next = { ...prev };
+      if (colStr === NO_COLUMN) delete next[field];
+      else next[field] = Number(colStr);
+      return next;
+    });
+  }
+
+  function acceptSuggestion(row: number, field: OverrideField, value: string) {
+    const key = `${row}:${field}`;
+    setApplied((prev) => ({ ...prev, [key]: value }));
+    setDismissed((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    toast.success(`Đã áp giá trị đề xuất cho dòng ${row} (${FIELD_LABELS[field]})`);
+  }
+
+  function dismissSuggestion(row: number, field: MappingField) {
+    const key = `${row}:${field}`;
+    setDismissed((prev) => ({ ...prev, [key]: true }));
+    setApplied((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function undoDismiss(row: number, field: MappingField) {
+    const key = `${row}:${field}`;
+    setDismissed((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   }
 
   function toggleRow(row: number) {
@@ -261,6 +310,13 @@ export function ImportExcelButton({
     (r) => selected[r.row] && isActionable(r) && r.score != null && !r.error
   ).length;
 
+  // Số cột để dựng combobox (ưu tiên nhãn cột từ server).
+  const colCount = Math.max(analysis?.columnHeaders?.length ?? 0, MAX_COLS);
+  const colLabel = (i: number) => {
+    const h = analysis?.columnHeaders?.[i];
+    return h ? `Cột ${i} — ${h}` : `Cột ${i}`;
+  };
+
   return (
     <>
       <Button
@@ -311,7 +367,9 @@ export function ImportExcelButton({
                   onChange={(e) => {
                     setFile(e.target.files?.[0] ?? null);
                     setAnalysis(null);
+                    setEditMapping({});
                     setApplied({});
+                    setDismissed({});
                   }}
                 />
               </div>
@@ -359,22 +417,50 @@ export function ImportExcelButton({
                       <p className="text-sm">
                         Sheet AI đề xuất: <strong>{analysis.sheetGuess}</strong>
                       </p>
-                      <div className="grid grid-cols-2 gap-1 text-sm sm:grid-cols-3">
-                        {FIELD_ORDER.map((f) => {
-                          const ref = analysis.columnMapping[f];
-                          return (
-                            <div key={f} className="rounded bg-muted px-2 py-1">
-                              {FIELD_LABELS[f]}:{" "}
-                              {ref ? (
-                                <span className="font-medium">
-                                  cột {ref.col} ({Math.round(ref.confidence * 100)}%)
+
+                      {/* Ánh xạ cột — combobox cho CVHT chỉnh lại (mục 5.5.2 bước 4). */}
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Ánh xạ cột (chỉnh nếu sai):</p>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          {FIELD_ORDER.map((f) => {
+                            const ref = analysis.columnMapping[f];
+                            const current = editMapping[f];
+                            return (
+                              <div key={f} className="flex items-center gap-2">
+                                <span className="w-16 shrink-0 text-sm">
+                                  {FIELD_LABELS[f]}
                                 </span>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </div>
-                          );
-                        })}
+                                <Select
+                                  value={
+                                    current === undefined
+                                      ? NO_COLUMN
+                                      : String(current)
+                                  }
+                                  onValueChange={(v) => setMappingField(f, v)}
+                                >
+                                  <SelectTrigger className="h-8 flex-1 text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={NO_COLUMN}>
+                                      — Không có —
+                                    </SelectItem>
+                                    {Array.from({ length: colCount }).map((_, i) => (
+                                      <SelectItem key={i} value={String(i)}>
+                                        {colLabel(i)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {ref && (
+                                  <span className="w-12 shrink-0 text-right text-xs text-muted-foreground">
+                                    {Math.round(ref.confidence * 100)}%
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
 
                       {analysis.rowAnomalies.length > 0 && (
@@ -382,38 +468,82 @@ export function ImportExcelButton({
                           <p className="text-sm font-medium">
                             Dòng nghi ngờ ({analysis.rowAnomalies.length}):
                           </p>
-                          <div className="max-h-40 space-y-1 overflow-auto">
-                            {analysis.rowAnomalies.map((a, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center justify-between gap-2 rounded bg-destructive/10 px-2 py-1 text-sm"
-                              >
-                                <span>
-                                  Dòng {a.row} · {FIELD_LABELS[a.field]}:{" "}
-                                  <code>{a.value || "(trống)"}</code> — {a.reason}
-                                  {a.suggestedValue != null && (
-                                    <>
-                                      {" "}→ đề xuất <code>{a.suggestedValue}</code>
-                                    </>
+                          <div className="max-h-48 space-y-1 overflow-auto">
+                            {analysis.rowAnomalies.map((a, i) => {
+                              const key = `${a.row}:${a.field}`;
+                              const isDismissed = dismissed[key];
+                              const isApplied =
+                                a.suggestedValue != null &&
+                                applied[key] === a.suggestedValue;
+                              // STT không ghi vào DB nên không cho "áp" — chỉ bỏ qua.
+                              const canApply =
+                                a.field !== "stt" && a.suggestedValue != null;
+                              return (
+                                <div
+                                  key={i}
+                                  className={cn(
+                                    "flex items-center justify-between gap-2 rounded px-2 py-1 text-sm",
+                                    isDismissed
+                                      ? "bg-muted/50 text-muted-foreground"
+                                      : "bg-destructive/10"
                                   )}
-                                </span>
-                                {a.field === "diem" && a.suggestedValue != null && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() =>
-                                      acceptSuggestion(a.row, a.suggestedValue!)
-                                    }
-                                    disabled={applied[a.row] === a.suggestedValue}
-                                  >
-                                    {applied[a.row] === a.suggestedValue
-                                      ? "Đã áp"
-                                      : "Áp dụng"}
-                                  </Button>
-                                )}
-                              </div>
-                            ))}
+                                >
+                                  <span>
+                                    Dòng {a.row} · {FIELD_LABELS[a.field]}:{" "}
+                                    <code>{a.value || "(trống)"}</code> — {a.reason}
+                                    {a.suggestedValue != null && (
+                                      <>
+                                        {" "}→ đề xuất <code>{a.suggestedValue}</code>
+                                      </>
+                                    )}
+                                  </span>
+                                  <span className="flex shrink-0 gap-1">
+                                    {isDismissed ? (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() =>
+                                          undoDismiss(a.row, a.field)
+                                        }
+                                      >
+                                        Hoàn tác
+                                      </Button>
+                                    ) : (
+                                      <>
+                                        {canApply && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() =>
+                                              acceptSuggestion(
+                                                a.row,
+                                                a.field as OverrideField,
+                                                a.suggestedValue!
+                                              )
+                                            }
+                                            disabled={isApplied}
+                                          >
+                                            {isApplied ? "Đã áp" : "Áp dụng"}
+                                          </Button>
+                                        )}
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            dismissSuggestion(a.row, a.field)
+                                          }
+                                        >
+                                          Bỏ qua
+                                        </Button>
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -421,12 +551,7 @@ export function ImportExcelButton({
                       <Button
                         type="button"
                         size="sm"
-                        onClick={() =>
-                          doPreview(
-                            toColumnMapping(analysis.columnMapping),
-                            analysis.sheetGuess
-                          )
-                        }
+                        onClick={() => doPreview(editMapping, analysis.sheetGuess)}
                         disabled={loading}
                       >
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

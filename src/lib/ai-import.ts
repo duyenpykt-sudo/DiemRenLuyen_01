@@ -79,6 +79,24 @@ export function buildSheetSamples(buffer: Buffer): SheetSample[] {
   });
 }
 
+/**
+ * Nhãn gợi ý cho từng cột (0-based) dựng từ các dòng tiêu đề — giúp CVHT
+ * chỉnh lại ánh xạ cột trên UI (combobox) thay vì chỉ thấy "Cột 0..11".
+ */
+export function columnHeaderLabels(
+  sample: SheetSample,
+  maxCols = MAX_COLS
+): string[] {
+  const labels: string[] = [];
+  for (let c = 0; c < maxCols; c++) {
+    const parts = sample.headerRows
+      .map((r) => r[c] ?? "")
+      .filter((v) => v !== "");
+    labels.push([...new Set(parts)].join(" / "));
+  }
+  return labels;
+}
+
 // ── responseSchema cho Gemini (Structured Output) ────────────────────────────
 const geminiColumnRef = {
   type: Type.OBJECT,
