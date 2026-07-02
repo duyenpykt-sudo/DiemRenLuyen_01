@@ -1,7 +1,7 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.5  
-**Ngày:** 01/07/2026  
+**Phiên bản:** 1.6  
+**Ngày:** 02/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
 > **Lịch sử thay đổi:**
@@ -10,7 +10,8 @@
 > - v1.2: khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.
 > - v1.3: làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).
 > - v1.4: thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.
-> - **v1.5 (hiện tại): trình bày rõ *Import Excel là phương thức nhập điểm thứ 3* ngay trong chức năng Điểm rèn luyện (mục 5.4) — bên cạnh 2 mode nhập tay; nút "Import Excel" trên `/scores`, ghi vào đúng Lớp × Học kỳ × Năm học đang chọn, có preview ghi-đè có kiểm soát (tham chiếu mục 5.5 / 5.5.2).**
+> - v1.5: trình bày rõ *Import Excel là phương thức nhập điểm thứ 3* ngay trong chức năng Điểm rèn luyện (mục 5.4) — bên cạnh 2 mode nhập tay; nút "Import Excel" trên `/scores`, ghi vào đúng Lớp × Học kỳ × Năm học đang chọn, có preview ghi-đè có kiểm soát (tham chiếu mục 5.5 / 5.5.2).
+> - **v1.6 (hiện tại): bổ sung *combobox lọc theo Năm học trên Dashboard* (mục 5.2.1) — lọc card thống kê + biểu đồ theo năm học được chọn, mặc định năm hiện hành, tính lại server-side, giữ nguyên phạm vi dữ liệu theo vai trò.**
 
 ---
 
@@ -247,6 +248,15 @@ model AuditLog {
 - **Admin**: tổng số khoa/lớp/SV/CVHT; biểu đồ phân bố xếp loại toàn hệ thống HK gần nhất.
 - **CVHT**: danh sách lớp phụ trách; số SV đã/chưa có điểm HK hiện tại; nút "Nhập điểm" và (nếu flag bật) "Import Excel".
 - **Trưởng khoa**: tổng SV toàn khoa; biểu đồ tổng hợp xếp loại theo lớp; export báo cáo nhanh.
+
+#### 5.2.1. Bộ lọc Năm học trên Dashboard (v1.6)
+
+- Dashboard có **combobox "Năm học"** ở đầu trang để lọc toàn bộ card thống kê + biểu đồ theo năm học được chọn.
+- **Nguồn dữ liệu options**: danh mục `AcademicYear` (mục 5.3.1) — nguồn duy nhất; sắp xếp năm mới nhất lên trước.
+- **Mặc định**: năm học hiện hành (năm chứa HK gần nhất có dữ liệu điểm; nếu chưa có thì năm học mới nhất trong danh mục).
+- Khi đổi năm học, các số liệu tính lại **server-side** cho năm đó (số SV đã/chưa có điểm, phân bố xếp loại, tổng hợp theo lớp). Không tin client.
+- **Phạm vi dữ liệu giữ nguyên theo vai trò** (mục 6.4): Admin toàn hệ thống, CVHT chỉ lớp mình phụ trách, Trưởng khoa chỉ khoa mình — combobox chỉ thu hẹp theo năm học, không mở rộng quyền.
+- Nếu năm học được chọn chưa có dữ liệu điểm → hiển thị trạng thái rỗng ("Chưa có dữ liệu điểm cho năm học này"), không lỗi.
 
 ### 5.3. Quản lý danh mục
 

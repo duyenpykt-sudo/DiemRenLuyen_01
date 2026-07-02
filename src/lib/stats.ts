@@ -72,9 +72,13 @@ export async function classTrend(classId: string) {
   return result;
 }
 
-/** Phân bố xếp loại toàn hệ thống (tất cả điểm đã nhập) — cho dashboard Admin. */
-export async function systemDistribution() {
+/**
+ * Phân bố xếp loại toàn hệ thống — cho dashboard Admin.
+ * Có thể lọc theo năm học (mục 5.2.1); bỏ trống = tất cả điểm đã nhập.
+ */
+export async function systemDistribution(academicYearId?: string) {
   const scores = await prisma.conductScore.findMany({
+    where: academicYearId ? { semester: { academicYearId } } : undefined,
     select: { classification: true },
   });
   const counts = emptyCounts();
