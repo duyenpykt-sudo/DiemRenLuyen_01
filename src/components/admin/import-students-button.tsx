@@ -384,9 +384,17 @@ export function ImportStudentsButton({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Toàn bộ SV trong file sẽ được gán vào lớp này.
-                </p>
+                {classes.length === 0 ? (
+                  <p className="text-xs text-destructive">
+                    Chưa tải được danh sách lớp. Kiểm tra kết nối cơ sở dữ liệu
+                    (Supabase có thể đang tạm dừng — tải lại trang sau ít giây)
+                    hoặc tạo Lớp trước ở tab &ldquo;Lớp&rdquo;.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Toàn bộ SV trong file sẽ được gán vào lớp này.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
