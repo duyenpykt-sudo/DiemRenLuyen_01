@@ -1,7 +1,7 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.4  
-**Ngày:** 01/07/2026  
+**Phiên bản:** 1.6  
+**Ngày:** 02/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
 > **Lịch sử thay đổi:**
@@ -9,7 +9,9 @@
 > - v1.1: tạm cắt 2 tính năng trên khỏi MVP.
 > - v1.2: khôi phục cả 2 tính năng. Import Excel implement đầy đủ nhưng có feature flag `IMPORT_EXCEL_ENABLED` (mặc định OFF) để ẩn UI khi chưa muốn dùng. Thêm CLI seed script.
 > - v1.3: làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).
-> - **v1.4 (hiện tại): thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.**
+> - v1.4: thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.
+> - v1.5: trình bày rõ *Import Excel là phương thức nhập điểm thứ 3* ngay trong chức năng Điểm rèn luyện (mục 5.4) — bên cạnh 2 mode nhập tay; nút "Import Excel" trên `/scores`, ghi vào đúng Lớp × Học kỳ × Năm học đang chọn, có preview ghi-đè có kiểm soát (tham chiếu mục 5.5 / 5.5.2).
+> - **v1.6 (hiện tại): bổ sung *combobox lọc theo Năm học trên Dashboard* (mục 5.2.1) — lọc card thống kê + biểu đồ theo năm học được chọn, mặc định năm hiện hành, tính lại server-side, giữ nguyên phạm vi dữ liệu theo vai trò.**
 
 ---
 
@@ -247,6 +249,15 @@ model AuditLog {
 - **CVHT**: danh sách lớp phụ trách; số SV đã/chưa có điểm HK hiện tại; nút "Nhập điểm" và (nếu flag bật) "Import Excel".
 - **Trưởng khoa**: tổng SV toàn khoa; biểu đồ tổng hợp xếp loại theo lớp; export báo cáo nhanh.
 
+#### 5.2.1. Bộ lọc Năm học trên Dashboard (v1.6)
+
+- Dashboard có **combobox "Năm học"** ở đầu trang để lọc toàn bộ card thống kê + biểu đồ theo năm học được chọn.
+- **Nguồn dữ liệu options**: danh mục `AcademicYear` (mục 5.3.1) — nguồn duy nhất; sắp xếp năm mới nhất lên trước.
+- **Mặc định**: năm học hiện hành (năm chứa HK gần nhất có dữ liệu điểm; nếu chưa có thì năm học mới nhất trong danh mục).
+- Khi đổi năm học, các số liệu tính lại **server-side** cho năm đó (số SV đã/chưa có điểm, phân bố xếp loại, tổng hợp theo lớp). Không tin client.
+- **Phạm vi dữ liệu giữ nguyên theo vai trò** (mục 6.4): Admin toàn hệ thống, CVHT chỉ lớp mình phụ trách, Trưởng khoa chỉ khoa mình — combobox chỉ thu hẹp theo năm học, không mở rộng quyền.
+- Nếu năm học được chọn chưa có dữ liệu điểm → hiển thị trạng thái rỗng ("Chưa có dữ liệu điểm cho năm học này"), không lỗi.
+
 ### 5.3. Quản lý danh mục
 
 CRUD cho: Khoa, Khóa học, Năm học, Học kỳ, Lớp, Sinh viên, Người dùng.
@@ -325,6 +336,20 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - Validation: điểm là integer 0-100; mỗi SV chỉ có 1 record cho 1 HK.
 - Server-side recompute xếp loại trước khi lưu (không tin client).
 
+#### Nhập điểm bằng Import Excel (phương thức thứ 3, ngoài 2 mode thủ công)
+
+Ngoài nhập tay (Mode A/B), chức năng **Điểm rèn luyện** còn cho phép **nhập hàng loạt bằng Import Excel** từ *Bảng tổng hợp điểm rèn luyện học kỳ theo lớp*:
+
+- Nút **"Import Excel"** hiển thị ngay trên trang `/scores`, chỉ khi:
+  - `IMPORT_EXCEL_ENABLED=true` (feature flag), **và**
+  - CVHT có quyền sửa lớp đang chọn, **và** Học kỳ chưa chốt (`isLocked=false`).
+- Import ghi vào đúng **Lớp × Học kỳ × Năm học** đang chọn ở bộ lọc 3 chiều (mục 5.4) — không cần chọn lại đích.
+- Preview đối chiếu từng dòng với `matchStatus` (matched / not_in_target_class / not_in_db) và `action` (create / overwrite / skip); dòng **"ghi đè"** mặc định **KHÔNG** chọn, CVHT tick mới cập nhật điểm đã có.
+- (Tùy chọn) **Phân tích bằng AI (Google Gemini)** để nhận diện cột & chuẩn hoá dữ liệu khi file đổi định dạng theo năm — mục 5.5.2.
+- **Xếp loại luôn recompute server-side** khi ghi; audit log `IMPORT_EXCEL` kèm số dòng tạo mới/ghi đè/lỗi.
+
+> Chi tiết luồng upload → preview → commit, quy tắc parse (header dòng 7, dừng ở "THỐNG KÊ"…), ghi đè có kiểm soát và feature flag: **xem mục 5.5** (và 5.5.2 cho phần AI).
+
 ### 5.5. Import Excel (có feature flag)
 
 > ⚠️ **Feature flag**: biến môi trường `IMPORT_EXCEL_ENABLED` trong `.env`.  
@@ -385,7 +410,7 @@ Trang `/scores` (CVHT + Admin) có **2 mode chuyển đổi qua tab**:
 - Ghi audit log `action = AI_ANALYZE_IMPORT` kèm `{ filename, sheet, rowsAnalyzed }` (không log nội dung điểm chi tiết vào oldValue/newValue).
 
 **Kỹ thuật (chốt theo Tech Stack):**
-- SDK: `@google/genai` (Google GenAI SDK chính thức). Model mặc định `gemini-2.5-flash` (rẻ, nhanh, đủ cho tác vụ nhận diện cấu trúc); cho phép cấu hình `GEMINI_MODEL` để đổi sang model mạnh hơn (`gemini-2.5-pro`) hoặc model mới hơn tuỳ nhu cầu.
+- SDK: `@google/genai` (Google GenAI SDK chính thức). Model mặc định `gemini-3.5-flash` (rẻ, nhanh, đủ cho tác vụ nhận diện cấu trúc); cho phép cấu hình `GEMINI_MODEL` để đổi sang model mạnh hơn tuỳ nhu cầu.
 - Dùng **Structured Output** của Gemini để ép JSON đúng schema: cấu hình `responseMimeType: "application/json"` + `responseSchema` (JSON schema tương ứng `AiImportAnalysisSchema`). **KHÔNG** parse thủ công text tự do.
 - Prompt đưa vào: tên các sheet, header dòng 1–7 và tối đa ~15 dòng dữ liệu mẫu (đủ để AI nhận diện, không gửi toàn bộ file nếu không cần). Với file > 200 dòng, chỉ gửi mẫu để lấy ánh xạ cột rồi áp ánh xạ đó cho toàn file bằng code tất định.
 - Server-side validate lại toàn bộ output AI bằng Zod (schema `AiImportAnalysisSchema`) trước khi trả về client — không tin cấu trúc trả về từ model dù đã khai báo `responseSchema`.
@@ -603,7 +628,7 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 | DB | SQLite (file `prisma/dev.db`) |
 | Auth | next-auth v5 (Credentials) |
 | Excel I/O | exceljs (đọc/ghi `.xlsx`), `xlsx` (fallback cho `.xls` cũ) |
-| AI nhận diện import | `@google/genai` (Google Gemini) — model mặc định `gemini-2.5-flash`, cấu hình qua `GEMINI_MODEL`; dùng Structured Output (`responseMimeType: application/json` + `responseSchema`) |
+| AI nhận diện import | `@google/genai` (Google Gemini) — model mặc định `gemini-3.5-flash`, cấu hình qua `GEMINI_MODEL`; dùng Structured Output (`responseMimeType: application/json` + `responseSchema`) |
 | Charts | recharts |
 | Bcrypt | bcryptjs |
 | Notification | sonner |
@@ -689,7 +714,7 @@ IMPORT_EXCEL_ENABLED=false
 # Bật = gửi dữ liệu file tới Google Gemini API để phân tích (dịch vụ ngoài)
 AI_IMPORT_ENABLED=false
 GEMINI_API_KEY=""
-GEMINI_MODEL="gemini-2.5-flash"   # có thể đổi: gemini-2.5-pro
+GEMINI_MODEL="gemini-3.5-flash"   # có thể đổi sang model mạnh hơn
 ```
 
 ---

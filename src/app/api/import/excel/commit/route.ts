@@ -57,8 +57,16 @@ export async function POST(req: Request) {
   const byCode = new Map(students.map((s) => [s.studentCode, s]));
   const byCccd = new Map(students.map((s) => [s.citizenId, s]));
 
+  // Điểm đã có tại học kỳ đích → phân biệt tạo mới vs ghi đè (cho audit).
+  const existing = await prisma.conductScore.findMany({
+    where: { semesterId, studentId: { in: students.map((s) => s.id) } },
+    select: { studentId: true },
+  });
+  const hasExisting = new Set(existing.map((e) => e.studentId));
+
   const userId = g.session.user.id;
-  let success = 0;
+  let created = 0;
+  let overwritten = 0;
   let failed = 0;
   for (const item of items) {
     const student = byCode.get(item.maSV) ?? byCccd.get(item.cccd);
@@ -66,6 +74,7 @@ export async function POST(req: Request) {
       failed++;
       continue;
     }
+    const willOverwrite = hasExisting.has(student.id);
     const classification = classifyScore(
       item.score,
       student.status as StudentStatus
@@ -85,9 +94,11 @@ export async function POST(req: Request) {
         updatedById: userId,
       },
     });
-    success++;
+    if (willOverwrite) overwritten++;
+    else created++;
   }
 
+  const success = created + overwritten;
   await writeAudit({
     userId,
     action: "IMPORT_EXCEL",
@@ -98,10 +109,18 @@ export async function POST(req: Request) {
       semesterId,
       rowsTotal: items.length,
       rowsSuccess: success,
+      rowsCreated: created,
+      rowsOverwritten: overwritten,
       rowsFailed: failed,
     },
     req,
   });
 
-  return apiOk({ rowsTotal: items.length, rowsSuccess: success, rowsFailed: failed });
+  return apiOk({
+    rowsTotal: items.length,
+    rowsSuccess: success,
+    rowsCreated: created,
+    rowsOverwritten: overwritten,
+    rowsFailed: failed,
+  });
 }

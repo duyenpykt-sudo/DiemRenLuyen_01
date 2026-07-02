@@ -15,7 +15,14 @@ export async function GET() {
     include: {
       semesters: {
         orderBy: { number: "asc" },
-        select: { id: true, number: true, name: true, isLocked: true },
+        select: {
+          id: true,
+          number: true,
+          name: true,
+          isLocked: true,
+          // Số bản ghi điểm đang gắn (mục 5.3.1) — dùng cho badge + chặn xóa.
+          _count: { select: { conductScores: true } },
+        },
       },
     },
   });

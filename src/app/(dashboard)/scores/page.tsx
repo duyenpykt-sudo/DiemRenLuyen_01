@@ -23,6 +23,8 @@ import {
 
 export default function ScoresPage() {
   const qc = useQueryClient();
+  // Bộ lọc 3 chiều (mục 5.4): Năm học → Học kỳ → Lớp.
+  const [academicYearId, setAcademicYearId] = useState("");
   const [classId, setClassId] = useState("");
   const [semesterId, setSemesterId] = useState("");
 
@@ -35,7 +37,21 @@ export default function ScoresPage() {
     queryFn: () => http.get<SemesterOption[]>("/api/scores/semesters"),
   });
 
-  const enabled = !!classId && !!semesterId;
+  // Danh sách Năm học (duy nhất) suy ra từ các học kỳ.
+  const years = Array.from(
+    new Map(
+      semesters.map((s) => [s.academicYearId, s.academicYear.name])
+    ).entries()
+  )
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => b.name.localeCompare(a.name));
+
+  // Học kỳ chỉ hiện các HK thuộc năm học đã chọn.
+  const semestersOfYear = semesters.filter(
+    (s) => s.academicYearId === academicYearId
+  );
+
+  const enabled = !!academicYearId && !!classId && !!semesterId;
   const scoresKey = ["scores", classId, semesterId];
   const { data, isLoading, isFetching } = useQuery({
     queryKey: scoresKey,
@@ -80,8 +96,51 @@ export default function ScoresPage() {
         )}
       </div>
 
-      {/* Bộ lọc Lớp + Học kỳ */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:max-w-2xl">
+      {/* Bộ lọc 3 chiều: Năm học → Học kỳ → Lớp (mục 5.4) */}
+      <div className="grid gap-4 sm:grid-cols-3 lg:max-w-3xl">
+        <div className="space-y-2">
+          <Label>Năm học</Label>
+          <Select
+            value={academicYearId}
+            onValueChange={(v) => {
+              setAcademicYearId(v);
+              setSemesterId(""); // đổi năm → bỏ chọn học kỳ cũ
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn năm học" />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((y) => (
+                <SelectItem key={y.id} value={y.id}>
+                  {y.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Học kỳ</Label>
+          <Select
+            value={semesterId}
+            onValueChange={setSemesterId}
+            disabled={!academicYearId}
+          >
+            <SelectTrigger>
+              <SelectValue
+                placeholder={academicYearId ? "Chọn học kỳ" : "Chọn năm học trước"}
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {semestersOfYear.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                  {s.isLocked ? " (đã chốt)" : ""}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-2">
           <Label>Lớp</Label>
           <Select value={classId} onValueChange={setClassId}>
@@ -97,27 +156,11 @@ export default function ScoresPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label>Học kỳ</Label>
-          <Select value={semesterId} onValueChange={setSemesterId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Chọn học kỳ" />
-            </SelectTrigger>
-            <SelectContent>
-              {semesters.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.academicYear.name} · {s.name}
-                  {s.isLocked ? " (đã chốt)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {!enabled ? (
         <p className="text-muted-foreground">
-          Vui lòng chọn lớp và học kỳ để xem bảng điểm.
+          Vui lòng chọn đủ Năm học, Học kỳ và Lớp để xem bảng điểm.
         </p>
       ) : isLoading ? (
         <div className="space-y-2">

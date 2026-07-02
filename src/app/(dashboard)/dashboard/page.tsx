@@ -8,6 +8,7 @@ import type { Classification } from "@/lib/enums";
 import { systemDistribution, emptyCounts } from "@/lib/stats";
 import { buildFacultySummary } from "@/lib/export-data";
 import { DistributionChart } from "@/components/charts/distribution-chart";
+import { DashboardYearFilter } from "@/components/dashboard/year-filter";
 import {
   Card,
   CardContent,
@@ -18,22 +19,57 @@ import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { ay?: string };
+}) {
   const session = await auth();
   const role = session!.user.role;
 
+  // Danh mục Năm học cho combobox lọc (mục 5.2.1) — năm mới nhất lên trước.
+  const years = await prisma.academicYear.findMany({
+    orderBy: { startYear: "desc" },
+    select: { id: true, name: true },
+  });
+  // Mặc định: năm chứa HK gần nhất CÓ dữ liệu điểm; nếu chưa có → năm mới nhất.
+  const semWithData = await prisma.semester.findFirst({
+    where: { conductScores: { some: {} } },
+    orderBy: [{ academicYear: { startYear: "desc" } }, { number: "desc" }],
+    select: { academicYearId: true },
+  });
+  const defaultYearId = semWithData?.academicYearId ?? years[0]?.id ?? "";
+  const selectedYearId =
+    years.find((y) => y.id === searchParams.ay)?.id ?? defaultYearId;
+  const yearName = years.find((y) => y.id === selectedYearId)?.name ?? "";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Tổng quan</h1>
-        <p className="text-muted-foreground">
-          Xin chào <span className="font-medium text-foreground">{session!.user.name}</span> 👋
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Tổng quan</h1>
+          <p className="text-muted-foreground">
+            Xin chào <span className="font-medium text-foreground">{session!.user.name}</span> 👋
+          </p>
+        </div>
+        <DashboardYearFilter years={years} value={selectedYearId} />
       </div>
-      {role === Role.ADMIN && <AdminDashboard />}
-      {role === Role.CVHT && <CvhtDashboard userId={session!.user.id} />}
+      {role === Role.ADMIN && (
+        <AdminDashboard academicYearId={selectedYearId} yearName={yearName} />
+      )}
+      {role === Role.CVHT && (
+        <CvhtDashboard
+          userId={session!.user.id}
+          academicYearId={selectedYearId}
+          yearName={yearName}
+        />
+      )}
       {role === Role.TRUONG_KHOA && (
-        <FacultyHeadDashboard facultyId={session!.user.facultyId} />
+        <FacultyHeadDashboard
+          facultyId={session!.user.facultyId}
+          academicYearId={selectedYearId}
+          yearName={yearName}
+        />
       )}
     </div>
   );
@@ -85,23 +121,21 @@ function StatCard({
   );
 }
 
-// Học kỳ mới nhất (theo năm + số HK).
-async function latestSemester() {
-  return prisma.semester.findFirst({
-    orderBy: [{ academicYear: { startYear: "desc" } }, { number: "desc" }],
-    include: { academicYear: { select: { name: true } } },
-  });
-}
-
 // ───────────────── Admin ─────────────────
-async function AdminDashboard() {
+async function AdminDashboard({
+  academicYearId,
+  yearName,
+}: {
+  academicYearId: string;
+  yearName: string;
+}) {
   const [totalStudents, totalClasses, totalCvht, totalSemesters, dist] =
     await Promise.all([
       prisma.student.count(),
       prisma.class.count(),
       prisma.user.count({ where: { role: Role.CVHT } }),
       prisma.semester.count(),
-      systemDistribution(),
+      systemDistribution(academicYearId || undefined),
     ]);
 
   return (
@@ -114,10 +148,18 @@ async function AdminDashboard() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Phân bố xếp loại toàn hệ thống</CardTitle>
+          <CardTitle className="text-base">
+            Phân bố xếp loại toàn hệ thống{yearName ? ` — Năm học ${yearName}` : ""}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <DistributionChart counts={dist.counts} variant="bar" />
+          {dist.total === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Chưa có dữ liệu điểm cho năm học này.
+            </p>
+          ) : (
+            <DistributionChart counts={dist.counts} variant="bar" />
+          )}
         </CardContent>
       </Card>
     </>
@@ -125,20 +167,30 @@ async function AdminDashboard() {
 }
 
 // ───────────────── CVHT ─────────────────
-async function CvhtDashboard({ userId }: { userId: string }) {
-  const sem = await latestSemester();
+async function CvhtDashboard({
+  userId,
+  academicYearId,
+  yearName,
+}: {
+  userId: string;
+  academicYearId: string;
+  yearName: string;
+}) {
   const classes = await prisma.class.findMany({
     where: { advisorId: userId },
     orderBy: { code: "asc" },
     include: { _count: { select: { students: true } } },
   });
 
-  // Đếm số SV đã có điểm HK hiện tại cho mỗi lớp.
+  // Đếm số SV đã có ít nhất 1 điểm trong năm học được chọn cho mỗi lớp.
   const withScore = new Map<string, number>();
-  if (sem) {
+  if (academicYearId) {
     for (const c of classes) {
-      const n = await prisma.conductScore.count({
-        where: { semesterId: sem.id, student: { classId: c.id } },
+      const n = await prisma.student.count({
+        where: {
+          classId: c.id,
+          conductScores: { some: { semester: { academicYearId } } },
+        },
       });
       withScore.set(c.id, n);
     }
@@ -147,8 +199,7 @@ async function CvhtDashboard({ userId }: { userId: string }) {
   return (
     <>
       <p className="text-sm text-muted-foreground">
-        Học kỳ hiện tại:{" "}
-        {sem ? `${sem.academicYear.name} · ${sem.name}` : "—"}
+        Năm học: {yearName || "—"}
       </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {classes.length === 0 ? (
@@ -169,7 +220,7 @@ async function CvhtDashboard({ userId }: { userId: string }) {
                 <CardContent className="space-y-2">
                   <p className="text-sm text-muted-foreground">{c.name}</p>
                   <Badge variant={done >= total && total > 0 ? "default" : "secondary"}>
-                    {done}/{total} SV đã có điểm HK hiện tại
+                    {done}/{total} SV đã có điểm trong năm học
                   </Badge>
                 </CardContent>
               </Card>
@@ -182,22 +233,27 @@ async function CvhtDashboard({ userId }: { userId: string }) {
 }
 
 // ───────────────── Trưởng khoa ─────────────────
-async function FacultyHeadDashboard({ facultyId }: { facultyId: string | null }) {
+async function FacultyHeadDashboard({
+  facultyId,
+  academicYearId,
+  yearName,
+}: {
+  facultyId: string | null;
+  academicYearId: string;
+  yearName: string;
+}) {
   if (!facultyId) {
     return <p className="text-muted-foreground">Tài khoản chưa gán khoa.</p>;
   }
   const totalStudents = await prisma.student.count({
     where: { class: { facultyId } },
   });
-  const latestYear = await prisma.academicYear.findFirst({
-    orderBy: { startYear: "desc" },
-  });
 
-  // Tổng hợp xếp loại toàn khoa (theo năm mới nhất).
-  let counts = emptyCounts();
-  if (latestYear) {
+  // Tổng hợp xếp loại toàn khoa theo năm học được chọn.
+  const counts = emptyCounts();
+  if (academicYearId) {
     const summary = await buildFacultySummary(facultyId, "NH", {
-      academicYearId: latestYear.id,
+      academicYearId,
     });
     summary?.classes.forEach((cl) => {
       (Object.keys(cl.counts) as Classification[]).forEach(
@@ -205,6 +261,7 @@ async function FacultyHeadDashboard({ facultyId }: { facultyId: string | null })
       );
     });
   }
+  const total = (Object.values(counts) as number[]).reduce((a, b) => a + b, 0);
 
   return (
     <>
@@ -214,11 +271,17 @@ async function FacultyHeadDashboard({ facultyId }: { facultyId: string | null })
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Tổng hợp xếp loại khoa{latestYear ? ` — Năm học ${latestYear.name}` : ""}
+            Tổng hợp xếp loại khoa{yearName ? ` — Năm học ${yearName}` : ""}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <DistributionChart counts={counts} variant="pie" />
+          {total === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Chưa có dữ liệu điểm cho năm học này.
+            </p>
+          ) : (
+            <DistributionChart counts={counts} variant="pie" />
+          )}
         </CardContent>
       </Card>
     </>

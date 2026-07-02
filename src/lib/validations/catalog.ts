@@ -51,6 +51,7 @@ export const cohortSchema = z
 export type CohortInput = z.infer<typeof cohortSchema>;
 
 // ───────────────────────────── Năm học (AcademicYear) ─────────────────────────────
+// Khác Cohort: năm học chỉ kéo dài 1 năm → endYear PHẢI = startYear + 1 (mục 5.3.1).
 export const academicYearSchema = z
   .object({
     name: z
@@ -58,8 +59,21 @@ export const academicYearSchema = z
       .trim()
       .min(1, { message: "Vui lòng nhập tên năm học" })
       .max(50, { message: "Tên năm học quá dài" }),
+    startYear: z.coerce
+      .number()
+      .int()
+      .min(2000, { message: "Năm bắt đầu không hợp lệ" })
+      .max(2100, { message: "Năm bắt đầu không hợp lệ" }),
+    endYear: z.coerce
+      .number()
+      .int()
+      .min(2000, { message: "Năm kết thúc không hợp lệ" })
+      .max(2100, { message: "Năm kết thúc không hợp lệ" }),
   })
-  .and(yearRange);
+  .refine((d) => d.endYear === d.startYear + 1, {
+    message: "Năm kết thúc phải bằng năm bắt đầu + 1",
+    path: ["endYear"],
+  });
 export type AcademicYearInput = z.infer<typeof academicYearSchema>;
 
 // ───────────────────────────── Lớp (Class) ─────────────────────────────

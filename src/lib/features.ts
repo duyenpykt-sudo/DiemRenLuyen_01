@@ -7,4 +7,11 @@
 export const features = {
   // Bật/tắt tính năng Import Excel. Mặc định OFF (ẩn nút UI + API trả 403).
   importExcel: process.env.IMPORT_EXCEL_ENABLED === "true",
+
+  // Bật/tắt AI nhận diện file Excel import (Google Gemini) — mục 5.5.2.
+  // Chỉ bật khi flag = true VÀ có GEMINI_API_KEY. Đây là điều kiện đủ để hiện
+  // nút "Phân tích bằng AI"; nút chỉ hoạt động trong luồng Import (importExcel).
+  aiImport:
+    process.env.AI_IMPORT_ENABLED === "true" &&
+    !!process.env.GEMINI_API_KEY?.trim(),
 };

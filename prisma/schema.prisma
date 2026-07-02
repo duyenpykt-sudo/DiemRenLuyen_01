@@ -6,8 +6,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // URL runtime — dùng connection pooler của Supabase (port 6543, pgbouncer).
+  url       = env("DATABASE_URL")
+  // URL kết nối trực tiếp (port 5432) — Prisma dùng cho migrate/introspect.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
