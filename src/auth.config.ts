@@ -13,6 +13,8 @@ import type { Role } from "@/lib/enums";
 const sessionMaxAge = Number(process.env.SESSION_MAX_AGE ?? 1800);
 
 export const authConfig = {
+  // Tin proxy/host của nền tảng (Vercel) để next-auth suy ra URL đúng khi deploy.
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
