@@ -14,6 +14,7 @@ import type { ClassRow, StudentRow } from "@/types/catalog";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { RowActions } from "@/components/admin/row-actions";
 import { FormSelect } from "@/components/admin/form-select";
+import { ImportStudentsButton } from "@/components/admin/import-students-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,15 +162,23 @@ export default function StudentsPage() {
         searchAccessor={(r) => `${r.studentCode} ${r.fullName} ${r.citizenId}`}
         searchPlaceholder="Tìm theo MSSV, họ tên, CCCD…"
         toolbar={
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm sinh viên
-          </Button>
+          <div className="flex gap-2">
+            <ImportStudentsButton
+              classes={classes}
+              onDone={() =>
+                qc.invalidateQueries({ queryKey: ["students"] })
+              }
+            />
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Thêm sinh viên
+            </Button>
+          </div>
         }
         actions={(row) => (
           <RowActions

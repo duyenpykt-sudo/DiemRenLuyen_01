@@ -1,6 +1,6 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.6  
+**Phiên bản:** 1.8  
 **Ngày:** 02/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
@@ -11,7 +11,9 @@
 > - v1.3: làm rõ 3 nhóm tính năng — (1) Import Excel từ *Bảng tổng hợp điểm rèn luyện từng học kỳ theo lớp* (mục 5.5); (2) Nhập điểm thủ công cho từng SV theo Lớp × Học kỳ × Năm học phục vụ cấp chứng nhận Điểm rèn luyện (mục 5.4); (3) Thêm/sửa Năm học và Học kỳ trong Quản lý danh mục (mục 5.3.1).
 > - v1.4: thêm tính năng *Nhận diện & chuẩn hoá file Excel import bằng AI (Google Gemini)* — mục 5.5.2. Khi format Excel của trường thay đổi theo từng năm (đổi tên cột/sheet, xê dịch cột, dữ liệu chưa chuẩn), model AI đề xuất ánh xạ cột + gắn cờ dữ liệu nghi ngờ để CVHT duyệt. Đứng sau feature flag `AI_IMPORT_ENABLED` (mặc định OFF), cần `GEMINI_API_KEY`.
 > - v1.5: trình bày rõ *Import Excel là phương thức nhập điểm thứ 3* ngay trong chức năng Điểm rèn luyện (mục 5.4) — bên cạnh 2 mode nhập tay; nút "Import Excel" trên `/scores`, ghi vào đúng Lớp × Học kỳ × Năm học đang chọn, có preview ghi-đè có kiểm soát (tham chiếu mục 5.5 / 5.5.2).
-> - **v1.6 (hiện tại): bổ sung *combobox lọc theo Năm học trên Dashboard* (mục 5.2.1) — lọc card thống kê + biểu đồ theo năm học được chọn, mặc định năm hiện hành, tính lại server-side, giữ nguyên phạm vi dữ liệu theo vai trò.**
+> - v1.6: bổ sung *combobox lọc theo Năm học trên Dashboard* (mục 5.2.1) — lọc card thống kê + biểu đồ theo năm học được chọn, mặc định năm hiện hành, tính lại server-side, giữ nguyên phạm vi dữ liệu theo vai trò.
+> - v1.7: bổ sung *Import danh sách sinh viên từ Excel* trong Quản lý danh mục (mục 5.3.2) — chọn lớp đích, upload file, preview + validate từng dòng (MSSV, CCCD, họ tên), đối chiếu trùng qua `studentCode`/`citizenId` với chế độ Bỏ qua/Cập nhật, chạy trong 1 transaction và ghi audit log. Quyền: Admin mọi lớp, CVHT chỉ lớp phụ trách, Trưởng khoa 403.
+> - **v1.8 (hiện tại): bổ sung cho mục 5.3.2 — (1) *Xuất file Excel mẫu danh sách sinh viên* (mục 5.3.2.1): template `.xlsx` sinh bằng exceljs, đúng cột + dropdown Giới tính/Trạng thái + sheet Hướng dẫn, để người dùng điền rồi import cho chuẩn; (2) *Nhận diện & chuẩn hoá file import SV bằng AI (Google Gemini)* (mục 5.3.2.2): dùng chung flag `AI_IMPORT_ENABLED`, AI đề xuất ánh xạ cột + gắn cờ dòng nghi ngờ, CVHT duyệt, validate lại server-side — tương tự mục 5.5.2.**
 
 ---
 
@@ -294,6 +296,118 @@ Tab **"Năm học & Học kỳ"** trong Quản lý danh mục (chỉ **Admin**).
 - **Không cho xóa** Năm học/Học kỳ nếu đang có `ConductScore` tham chiếu → hiện cảnh báo, đề xuất khóa thay vì xóa.
 - Mọi thao tác thêm/sửa/xóa/khóa đều ghi **audit log** (`entityType = 'AcademicYear' | 'Semester'`).
 - Các combobox chọn Học kỳ ở trang Nhập điểm, Import, Export đều lấy dữ liệu từ danh mục này (nguồn duy nhất).
+
+#### 5.3.2. Import danh sách sinh viên từ Excel
+
+> **Mục tiêu:** cho phép nạp nhanh **danh sách sinh viên của một lớp** từ file Excel vào danh mục Sinh viên, thay cho việc thêm tay từng SV. Đây là import **hồ sơ sinh viên** (khác với Import *điểm rèn luyện* ở mục 5.5).
+
+**Quyền:**
+- **Admin**: import vào bất kỳ lớp nào.
+- **CVHT**: chỉ import vào **lớp mình phụ trách** (`Class.advisorId = currentUser.id`).
+- **Trưởng khoa**: không được import (chỉ đọc) → API trả **403**.
+
+**Vị trí:** nút **"Import sinh viên"** trong tab Sinh viên của Quản lý danh mục (và trong màn Chi tiết lớp).
+
+**Luồng:**
+1. Chọn **Lớp** đích (CVHT chỉ thấy lớp mình; Admin thấy tất cả). Tất cả SV trong file sẽ gán `classId` = lớp này.
+2. Tải lên file Excel (`.xlsx`/`.xls`). Có nút **"Tải file Excel mẫu"** để lấy template đúng cột (chi tiết mục 5.3.2.1) — nhập liệu vào file mẫu này để hạn chế sai định dạng.
+3. Hệ thống parse và hiển thị **preview** dạng bảng: STT | MSSV | CCCD | Họ tên | Giới tính | Ngày sinh | Trạng thái | Ghi chú | **Kết quả đối chiếu**.
+4. Người dùng xem preview, sửa lỗi hoặc bỏ tick dòng không muốn nhập → bấm **Xác nhận import**.
+
+**Cột file Excel (mẫu):** `STT | MSSV | CCCD | Họ tên | Giới tính | Ngày sinh | Trạng thái | Ghi chú`
+- Ánh xạ vào `Student`: `studentCode`, `citizenId`, `fullName`, `gender`, `dob`, `status`, `note`. `classId` lấy từ lớp đã chọn (không nằm trong file).
+- `Giới tính`: chấp nhận `Nam|Nữ|Khác` → map `MALE|FEMALE|OTHER` (rỗng → `null`).
+- `Ngày sinh`: chấp nhận `dd/MM/yyyy` hoặc ô ngày Excel → `DateTime` (rỗng → `null`).
+- `Trạng thái`: chấp nhận `Đang học|Bảo lưu|Tốt nghiệp|Thôi học` → map `ACTIVE|SUSPENDED|GRADUATED|DROPPED` (rỗng → `ACTIVE`).
+
+**Validation (Zod, server-side) từng dòng:**
+- `studentCode`: bắt buộc, khớp regex `^[0-9]{3}[A-Z]{3}[0-9]{3}$` (vd `221CTT006`).
+- `citizenId`: bắt buộc, đúng 12 chữ số.
+- `fullName`: bắt buộc, không rỗng.
+- Trùng **trong chính file**: 2 dòng cùng `studentCode` hoặc cùng `citizenId` → gắn cờ lỗi.
+- Mỗi dòng lỗi hiển thị `reason` tiếng Việt; dòng lỗi **không** được commit.
+
+**Đối chiếu & chế độ ghi:**
+- Đối chiếu SV đã tồn tại qua `studentCode` (UNIQUE), fallback `citizenId` (UNIQUE).
+- Với SV đã tồn tại, cho chọn **1 trong 2** chế độ (radio trước khi import):
+  - **Bỏ qua** (mặc định): giữ nguyên bản ghi cũ, chỉ thêm SV mới.
+  - **Cập nhật**: ghi đè các field hồ sơ từ file (kể cả chuyển `classId` sang lớp đang chọn).
+- Preview đánh dấu mỗi dòng: `Thêm mới` / `Đã tồn tại — sẽ cập nhật` / `Đã tồn tại — sẽ bỏ qua` / `Lỗi`.
+
+**Kết quả & ràng buộc:**
+- Sau import hiện tổng kết: số **thêm mới**, số **cập nhật**, số **bỏ qua**, số **lỗi** (kèm danh sách dòng lỗi).
+- Toàn bộ ghi hợp lệ chạy trong **1 transaction**; dòng lỗi bị loại, không chặn các dòng hợp lệ.
+- Mỗi SV thêm/cập nhật ghi **audit log** (`entityType = 'Student'`, `action = 'IMPORT_CREATE' | 'IMPORT_UPDATE'`).
+- Hỗ trợ nhận diện & chuẩn hoá file bằng AI khi bật flag — chi tiết mục 5.3.2.2.
+
+**API:**
+- `GET /api/students/import/template` → tải file `.xlsx` mẫu (mục 5.3.2.1).
+- `POST /api/students/import/preview` (multipart, kèm `classId`) → trả preview JSON đã validate + đối chiếu trùng.
+- `POST /api/students/import/commit` → ghi DB trong 1 transaction.
+- Cả 2 API preview/commit check session + role: CVHT chỉ được `classId` thuộc lớp mình; Trưởng khoa → 403.
+
+##### 5.3.2.1. Xuất file Excel mẫu danh sách sinh viên
+
+> **Mục tiêu:** cung cấp file mẫu **đúng cột, đúng định dạng** để người dùng điền rồi import lại, giảm tối đa lỗi nhập liệu (sai tên cột, sai định dạng ngày/giới tính/trạng thái).
+
+- Nút **"Tải file Excel mẫu"** trong màn Import sinh viên → gọi `GET /api/students/import/template`, sinh file `.xlsx` bằng **exceljs** (khớp Tech Stack — export dùng exceljs).
+- **Sheet `DanhSachSinhVien`** — header dòng 1, đúng thứ tự cột khớp mục 5.3.2:
+  `STT | MSSV | CCCD | Họ tên | Giới tính | Ngày sinh | Trạng thái | Ghi chú`.
+  - 1–2 **dòng ví dụ mẫu** (in nhạt/italic) để người dùng biết cách điền, vd `1 | 221CTT006 | 012345678901 | Nguyễn Văn A | Nam | 15/08/2004 | Đang học | `. Ghi rõ trong Hướng dẫn là **xoá dòng ví dụ trước khi import**.
+  - **Data validation (dropdown)** ngay trong Excel:
+    - Cột `Giới tính`: danh sách `Nam, Nữ, Khác`.
+    - Cột `Trạng thái`: danh sách `Đang học, Bảo lưu, Tốt nghiệp, Thôi học`.
+  - Cột `MSSV`, `CCCD`, `Ngày sinh` định dạng **Text** để tránh Excel tự cắt số 0 đầu / tự đổi ngày; ghi chú định dạng ngày `dd/MM/yyyy`.
+  - Cột bắt buộc (`MSSV`, `CCCD`, `Họ tên`) tô đậm/nền màu để nhấn mạnh.
+- **Sheet `HuongDan`** — mô tả từng cột: bắt buộc/tuỳ chọn, regex MSSV `^[0-9]{3}[A-Z]{3}[0-9]{3}$`, CCCD 12 số, giá trị hợp lệ của Giới tính/Trạng thái, định dạng ngày, lưu ý `classId` **không** nằm trong file (chọn lớp trên giao diện khi import).
+- Tên file tải về: `mau-danh-sach-sinh-vien.xlsx`. Không cần feature flag (chỉ là file tĩnh sinh theo request); quyền: đăng nhập + có quyền import (Admin/CVHT).
+
+##### 5.3.2.2. Nhận diện & chuẩn hoá file import SV bằng AI (Google Gemini)
+
+> ⚠️ **Dùng chung feature flag** `AI_IMPORT_ENABLED` (mặc định `false`) + `GEMINI_API_KEY`, tương tự mục 5.5.2. Khi flag tắt → nút "Phân tích bằng AI" ẩn, `POST /api/students/import/ai-analyze` trả **403**, luồng import chạy 100% bằng parser tất định.
+
+**Vấn đề giải quyết:** file danh sách SV do trường/khoa cung cấp mỗi năm mỗi khác — đổi tên cột (`MSSV` ↔ `Mã SV` ↔ `Mã sinh viên`), xê dịch/thêm cột, giới tính ghi `M/F` hay `Nam/Nu`, trạng thái ghi tự do, ngày sinh nhiều định dạng, MSSV mất số 0 đầu, CCCD 11 số… Parser tất định bám cột cố định dễ gãy khi format lệch.
+
+**Vai trò của AI (chỉ hỗ trợ, không quyết định) — song song mục 5.5.2:**
+1. **Ánh xạ cột**: đề xuất cột nào ứng với `stt | mssv | cccd | hoTen | gioiTinh | ngaySinh | trangThai | ghiChu`, kèm độ tin cậy 0–1.
+2. **Nhận diện sheet** chứa danh sách SV khi tên sheet khác mẫu.
+3. **Gắn cờ dòng nghi ngờ**: MSSV sai regex, CCCD ≠ 12 số, ngày sinh sai định dạng, Giới tính/Trạng thái không map được, nghi đảo cột Họ tên/Mã, dòng có vẻ là tiêu đề lẫn vào — mỗi cờ kèm `reason` tiếng Việt + `suggestedValue` (giá trị chuẩn hoá đề xuất, nếu có).
+
+**Ranh giới bắt buộc (an toàn dữ liệu):**
+- AI **chỉ đề xuất**; CVHT **duyệt thủ công** trên bảng preview trước khi commit — không ghi thẳng từ AI vào DB.
+- **Ưu tiên parser tất định**: nếu map đủ cột và không có dòng lỗi → không gọi AI. AI chỉ kích hoạt khi map lỗi/thiếu cột hoặc CVHT bấm "Phân tích bằng AI".
+- Mọi `suggestedValue` do AI đề xuất vẫn phải qua **validation Zod server-side** (MSSV regex, CCCD 12 số, enum Giới tính/Trạng thái, ngày hợp lệ) trước khi được chấp nhận.
+
+**Quyền riêng tư (BẮT BUỘC nêu rõ):**
+- Bật AI = **gửi dữ liệu file (header + các dòng SV: MSSV, CCCD, họ tên, ngày sinh…) tới Google Gemini API**. Đây là dịch vụ ngoài, chạy trên internet. UI hiện cảnh báo và yêu cầu CVHT xác nhận (checkbox) trước lần chạy đầu.
+- Ghi audit log `action = AI_ANALYZE_IMPORT_STUDENTS` kèm `{ filename, sheet, rowsAnalyzed }` (không log nội dung cá nhân chi tiết).
+
+**Kỹ thuật:** dùng lại hạ tầng mục 5.5.2 — SDK `@google/genai`, model `GEMINI_MODEL` (mặc định `gemini-3.5-flash`), **Structured Output** (`responseMimeType: "application/json"` + `responseSchema`), server-side validate lại bằng Zod (`AiStudentImportAnalysisSchema`); lỗi quota/timeout/key sai → fallback parser tất định + thông báo tiếng Việt.
+
+**Schema kết quả AI (preview):**
+```jsonc
+{
+  "sheetGuess": "DanhSachSinhVien",
+  "columnMapping": {                          // index cột (0-based) + độ tin cậy
+    "stt":       { "col": 0, "confidence": 0.98 },
+    "mssv":      { "col": 1, "confidence": 0.99 },
+    "cccd":      { "col": 2, "confidence": 0.95 },
+    "hoTen":     { "col": 3, "confidence": 0.97 },
+    "gioiTinh":  { "col": 4, "confidence": 0.85 },
+    "ngaySinh":  { "col": 5, "confidence": 0.80 },
+    "trangThai": { "col": 6, "confidence": 0.70 },
+    "ghiChu":    { "col": 7, "confidence": 0.60 }
+  },
+  "rowAnomalies": [
+    { "row": 12, "field": "mssv",      "value": "21CTT006",   "suggestedValue": "221CTT006", "reason": "MSSV thiếu 1 số đầu so với regex" },
+    { "row": 15, "field": "cccd",      "value": "0123456789", "suggestedValue": null,        "reason": "CCCD chỉ có 10 số, cần kiểm tra tay" },
+    { "row": 18, "field": "gioiTinh",  "value": "M",          "suggestedValue": "Nam",       "reason": "Giá trị 'M' quy về 'Nam'" },
+    { "row": 20, "field": "ngaySinh",  "value": "2004-08-15", "suggestedValue": "15/08/2004","reason": "Chuẩn hoá về dd/MM/yyyy" }
+  ]
+}
+```
+
+**Flow người dùng (khi flag bật):** chọn Lớp → upload file → parser tất định thử map; nếu OK → preview bình thường; nếu lỗi/thiếu cột hoặc bấm "Phân tích bằng AI" → cảnh báo quyền riêng tư → `POST /api/students/import/ai-analyze` → CVHT sửa ánh xạ cột + duyệt từng dòng nghi ngờ ("Áp giá trị đề xuất"/"Bỏ qua") → dựng lại bảng theo ánh xạ đã chốt → **preview chuẩn của 5.3.2** (validate server-side) → commit.
 
 ### 5.4. Nhập điểm thủ công
 

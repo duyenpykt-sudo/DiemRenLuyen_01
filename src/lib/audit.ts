@@ -7,7 +7,11 @@ export type AuditAction =
   | "LOCK"
   | "UNLOCK"
   | "IMPORT_EXCEL"
-  | "EXPORT_EXCEL";
+  | "EXPORT_EXCEL"
+  | "IMPORT_CREATE"
+  | "IMPORT_UPDATE"
+  | "AI_ANALYZE_IMPORT"
+  | "AI_ANALYZE_IMPORT_STUDENTS";
 
 interface WriteAuditParams {
   userId: string;
