@@ -4,6 +4,7 @@ import { apiOk, apiError, apiValidationError } from "@/lib/api-response";
 import { requireRole } from "@/lib/guard";
 import { writeAudit } from "@/lib/audit";
 import { getClassPermission } from "@/lib/scores-access";
+import { dbError, handleMutationError } from "@/lib/prisma-error";
 import { GenderSchema, StudentStatusSchema } from "@/lib/enums";
 
 // Item đã chuẩn hoá ở preview — commit VẪN validate lại (không tin client).
@@ -52,10 +53,15 @@ export async function POST(req: Request) {
   // Đối chiếu toàn hệ thống (studentCode/citizenId UNIQUE).
   const codes = items.map((i) => i.studentCode);
   const cccds = items.map((i) => i.citizenId);
-  const existing = await prisma.student.findMany({
-    where: { OR: [{ studentCode: { in: codes } }, { citizenId: { in: cccds } }] },
-    select: { id: true, studentCode: true, citizenId: true },
-  });
+  let existing;
+  try {
+    existing = await prisma.student.findMany({
+      where: { OR: [{ studentCode: { in: codes } }, { citizenId: { in: cccds } }] },
+      select: { id: true, studentCode: true, citizenId: true },
+    });
+  } catch (e) {
+    return dbError(e);
+  }
   const byCode = new Map(existing.map((s) => [s.studentCode, s]));
   const byCccd = new Map(existing.map((s) => [s.citizenId, s]));
 
@@ -104,16 +110,21 @@ export async function POST(req: Request) {
   });
 
   // Ghi hợp lệ trong 1 transaction.
-  const done = await prisma.$transaction(
-    ops.map((op) =>
-      op.kind === "create"
-        ? prisma.student.create({ data: { ...toData(op.item), classId } })
-        : prisma.student.update({
-            where: { id: op.id },
-            data: { ...toData(op.item), classId },
-          })
-    )
-  );
+  let done;
+  try {
+    done = await prisma.$transaction(
+      ops.map((op) =>
+        op.kind === "create"
+          ? prisma.student.create({ data: { ...toData(op.item), classId } })
+          : prisma.student.update({
+              where: { id: op.id },
+              data: { ...toData(op.item), classId },
+            })
+      )
+    );
+  } catch (e) {
+    return handleMutationError(e, "sinh viên");
+  }
 
   const userId = g.session.user.id;
   let created = 0;

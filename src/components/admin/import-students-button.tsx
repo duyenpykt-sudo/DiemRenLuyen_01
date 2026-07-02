@@ -157,6 +157,36 @@ export function ImportStudentsButton({
     return s;
   }
 
+  // Tải file mẫu bằng blob (thay vì <a download>) — chắc chắn tải được trên mọi
+  // trình duyệt và báo lỗi rõ ràng nếu thất bại.
+  const [downloading, setDownloading] = useState(false);
+  async function downloadTemplate() {
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/students/import/template");
+      if (!res.ok) {
+        throw new Error(
+          res.status === 403
+            ? "Bạn không có quyền tải file mẫu."
+            : "Không tải được file mẫu."
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "mau-danh-sach-sinh-vien.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   function collectOverrides() {
     return Object.entries(applied).map(([key, value]) => {
       const [row, field] = key.split(":");
@@ -380,12 +410,20 @@ export function ImportStudentsButton({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="file">File Excel (.xls/.xlsx, ≤ 5MB)</Label>
-                  <a href="/api/students/import/template" download>
-                    <Button type="button" variant="ghost" size="sm">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={downloadTemplate}
+                    disabled={downloading}
+                  >
+                    {downloading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
                       <Download className="mr-2 h-4 w-4" />
-                      Tải file mẫu
-                    </Button>
-                  </a>
+                    )}
+                    Tải file mẫu
+                  </Button>
                 </div>
                 <Input
                   id="file"

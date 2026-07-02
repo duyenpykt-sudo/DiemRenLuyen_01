@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireRole } from "@/lib/guard";
 import { getClassPermission } from "@/lib/scores-access";
+import { dbError } from "@/lib/prisma-error";
 import {
   parseStudentBuffer,
   normalizeStudentRow,
@@ -101,16 +102,21 @@ export async function POST(req: Request) {
   const cccds = normalized
     .map((n) => n.res.data?.citizenId)
     .filter((v): v is string => !!v);
-  const existing = await prisma.student.findMany({
-    where: { OR: [{ studentCode: { in: codes } }, { citizenId: { in: cccds } }] },
-    select: {
-      id: true,
-      studentCode: true,
-      citizenId: true,
-      classId: true,
-      class: { select: { code: true } },
-    },
-  });
+  let existing;
+  try {
+    existing = await prisma.student.findMany({
+      where: { OR: [{ studentCode: { in: codes } }, { citizenId: { in: cccds } }] },
+      select: {
+        id: true,
+        studentCode: true,
+        citizenId: true,
+        classId: true,
+        class: { select: { code: true } },
+      },
+    });
+  } catch (e) {
+    return dbError(e);
+  }
   const byCode = new Map(existing.map((s) => [s.studentCode, s]));
   const byCccd = new Map(existing.map((s) => [s.citizenId, s]));
 
