@@ -1,7 +1,7 @@
 # PRD — Ứng dụng Quản lý Điểm Rèn luyện Sinh viên
 
-**Phiên bản:** 1.8  
-**Ngày:** 02/07/2026  
+**Phiên bản:** 1.9  
+**Ngày:** 20/07/2026  
 **Mục tiêu sử dụng:** Tài liệu yêu cầu sản phẩm để xây dựng ứng dụng bằng Claude Code.
 
 > **Lịch sử thay đổi:**
@@ -13,7 +13,8 @@
 > - v1.5: trình bày rõ *Import Excel là phương thức nhập điểm thứ 3* ngay trong chức năng Điểm rèn luyện (mục 5.4) — bên cạnh 2 mode nhập tay; nút "Import Excel" trên `/scores`, ghi vào đúng Lớp × Học kỳ × Năm học đang chọn, có preview ghi-đè có kiểm soát (tham chiếu mục 5.5 / 5.5.2).
 > - v1.6: bổ sung *combobox lọc theo Năm học trên Dashboard* (mục 5.2.1) — lọc card thống kê + biểu đồ theo năm học được chọn, mặc định năm hiện hành, tính lại server-side, giữ nguyên phạm vi dữ liệu theo vai trò.
 > - v1.7: bổ sung *Import danh sách sinh viên từ Excel* trong Quản lý danh mục (mục 5.3.2) — chọn lớp đích, upload file, preview + validate từng dòng (MSSV, CCCD, họ tên), đối chiếu trùng qua `studentCode`/`citizenId` với chế độ Bỏ qua/Cập nhật, chạy trong 1 transaction và ghi audit log. Quyền: Admin mọi lớp, CVHT chỉ lớp phụ trách, Trưởng khoa 403.
-> - **v1.8 (hiện tại): bổ sung cho mục 5.3.2 — (1) *Xuất file Excel mẫu danh sách sinh viên* (mục 5.3.2.1): template `.xlsx` sinh bằng exceljs, đúng cột + dropdown Giới tính/Trạng thái + sheet Hướng dẫn, để người dùng điền rồi import cho chuẩn; (2) *Nhận diện & chuẩn hoá file import SV bằng AI (Google Gemini)* (mục 5.3.2.2): dùng chung flag `AI_IMPORT_ENABLED`, AI đề xuất ánh xạ cột + gắn cờ dòng nghi ngờ, CVHT duyệt, validate lại server-side — tương tự mục 5.5.2.**
+> - v1.8: bổ sung cho mục 5.3.2 — (1) *Xuất file Excel mẫu danh sách sinh viên* (mục 5.3.2.1): template `.xlsx` sinh bằng exceljs, đúng cột + dropdown Giới tính/Trạng thái + sheet Hướng dẫn, để người dùng điền rồi import cho chuẩn; (2) *Nhận diện & chuẩn hoá file import SV bằng AI (Google Gemini)* (mục 5.3.2.2): dùng chung flag `AI_IMPORT_ENABLED`, AI đề xuất ánh xạ cột + gắn cờ dòng nghi ngờ, CVHT duyệt, validate lại server-side — tương tự mục 5.5.2.
+> - **v1.9 (hiện tại): bổ sung *Chatbox trợ lý trong hệ thống* (mục 5.11) — hỗ trợ người dùng hỏi nhanh về thao tác nhập điểm/import/export/tra cứu, giải thích số liệu trong phạm vi quyền truy cập, gợi ý điều hướng tới màn hình liên quan; đứng sau feature flag `CHATBOX_ENABLED` (mặc định OFF), có thể dùng Google Gemini qua `GEMINI_API_KEY`, không tự ghi dữ liệu vào DB.**
 
 ---
 
@@ -28,6 +29,7 @@
 - **Nhập điểm thủ công**: 2 mode — form Dialog đơn giản + bảng inline editable.
 - **Import Excel**: có UI hoàn chỉnh, ẩn/hiện qua feature flag.
 - **Export Excel** theo đúng mẫu file `DC22CTT01-II-25-26.xls` (7 sheet).
+- **Chatbox trợ lý**: hỗ trợ hỏi đáp thao tác, tra cứu nhanh và giải thích dữ liệu trong phạm vi quyền người dùng (ẩn/hiện qua feature flag).
 - **CLI seed**: lệnh `npm run seed:excel` để nhập nhanh dữ liệu cũ lúc cài đặt.
 
 ---
@@ -54,6 +56,7 @@
 - Là Admin, tôi muốn tạo khoa, lớp, khóa học, năm học, học kỳ để khởi tạo hệ thống.
 - Là Admin, tôi muốn seed dữ liệu ban đầu từ file Excel mẫu vào DB qua 1 lệnh CLI.
 - Là Admin, tôi muốn bật/tắt tính năng "Import Excel" qua biến môi trường mà không cần sửa code.
+- Là Admin, tôi muốn bật/tắt Chatbox qua biến môi trường và xem log sử dụng ở mức metadata để kiểm soát chi phí/bảo mật.
 - Là Admin, tôi muốn xem toàn bộ audit log để giám sát.
 
 **CVHT**
@@ -64,11 +67,13 @@
 - Là CVHT, tôi muốn xem thống kê xếp loại của lớp mình theo từng học kỳ/năm/khóa.
 - Là CVHT, tôi muốn tra cứu nhanh điểm 1 SV theo MSSV hoặc CCCD.
 - Là CVHT, tôi muốn hệ thống tự tính điểm cả năm và điểm toàn khóa khi đã có đủ điểm các HK.
+- Là CVHT, tôi muốn hỏi Chatbox cách nhập điểm/import/export và nhờ giải thích nhanh tình hình điểm của lớp mình trong phạm vi dữ liệu được phép xem.
 
 **Trưởng khoa**
 - Là Trưởng khoa, tôi muốn xem tổng hợp xếp loại các lớp trong khoa theo HK/Năm/Khóa.
 - Là Trưởng khoa, tôi muốn export báo cáo TONG HOP-HK / TONG HOP-NH / TONG HOP-TK của khoa.
 - Là Trưởng khoa, tôi muốn xem biểu đồ phân bố xếp loại theo lớp/khoa.
+- Là Trưởng khoa, tôi muốn hỏi Chatbox về số liệu tổng hợp của khoa và nhận gợi ý mở đúng màn hình thống kê/báo cáo liên quan.
 
 ---
 
@@ -92,6 +97,7 @@ model User {
   isActive     Boolean   @default(true)
   advisedClasses Class[] @relation("ClassAdvisor")
   auditLogs    AuditLog[]
+  chatMessages ChatMessage[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -225,6 +231,24 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@index([entityType, entityId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      ChatRole
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
 }
 ```
 
@@ -619,6 +643,54 @@ Dùng `recharts`:
 - Admin xem toàn bộ; CVHT xem log của mình.
 - Filter theo: user, action, entityType, khoảng ngày.
 
+### 5.11. Chatbox trợ lý trong hệ thống (v1.9)
+
+> ⚠️ **Feature flag**: `CHATBOX_ENABLED` trong `.env` (mặc định `false`) + `GEMINI_API_KEY`.
+> - `CHATBOX_ENABLED=false` → ẩn nút chatbox trên UI; API `/api/chat` trả **403**.
+> - `CHATBOX_ENABLED=true` và có `GEMINI_API_KEY` hợp lệ → hiện nút chatbox dạng floating button ở góc phải dưới toàn bộ màn hình dashboard.
+> - Chatbox là trợ lý hỗ trợ thao tác và tra cứu, **không phải kênh ghi dữ liệu**: không tự tạo/sửa/xóa điểm, sinh viên, lớp, user hoặc danh mục.
+
+**Mục tiêu:**
+- Giúp người dùng hỏi nhanh cách dùng hệ thống: nhập điểm, import Excel, export báo cáo, tra cứu sinh viên, xem thống kê, sao lưu dữ liệu.
+- Trả lời các câu hỏi dữ liệu đọc-only trong phạm vi quyền truy cập, ví dụ:
+  - CVHT: "Lớp DC22CTT01 còn bao nhiêu sinh viên chưa có điểm HK2?", "Sinh viên 221CTT006 đang xếp loại gì?"
+  - Trưởng khoa: "Khoa CNTT có lớp nào tỉ lệ loại Yếu cao nhất trong năm 2025-2026?"
+  - Admin: "Có bao nhiêu lớp chưa gán đủ dữ liệu sinh viên?"
+- Gợi ý điều hướng bằng link nội bộ, ví dụ `/scores`, `/students/{id}`, `/stats`, `/audit-logs`, nhưng người dùng vẫn tự thao tác trên màn hình chính.
+
+**Phạm vi trả lời:**
+- Hỏi đáp hướng dẫn thao tác dựa trên PRD/README/nội dung UI hiện có.
+- Truy vấn dữ liệu tổng hợp/read-only qua các hàm server-side đã kiểm soát quyền.
+- Giải thích quy tắc xếp loại, cách tính điểm năm học/toàn khóa, ý nghĩa biểu đồ và file export.
+- Không trả lời hoặc phải từ chối lịch sự nếu câu hỏi yêu cầu dữ liệu ngoài phạm vi quyền, dữ liệu nhạy cảm không cần thiết, mật khẩu, secret trong `.env`, hoặc thao tác thay đổi dữ liệu.
+
+**Quyền và bảo mật:**
+- Mọi request phải có session hợp lệ; không cho dùng chatbox ở màn login.
+- Áp dụng đúng row-level access (mục 6.4) cho mọi dữ liệu đưa vào prompt/context.
+- Prompt gửi tới Gemini chỉ chứa dữ liệu tối thiểu cần thiết; không gửi toàn bộ database.
+- Không bao giờ gửi `passwordHash`, `NEXTAUTH_SECRET`, `GEMINI_API_KEY`, nội dung file `.env`, hoặc audit log chi tiết có dữ liệu nhạy cảm.
+- Nếu câu hỏi cần truy cập dữ liệu cá nhân sinh viên, chỉ trả thông tin cần thiết cho nghiệp vụ điểm rèn luyện; không suy diễn thông tin ngoài dữ liệu hệ thống.
+
+**UX:**
+- Floating button icon chat ở góc phải dưới; click mở panel chat dạng sheet/drawer.
+- Panel có lịch sử hội thoại gần nhất, ô nhập, nút gửi, trạng thái "Đang trả lời...", nút xoá cuộc trò chuyện hiện tại.
+- Tin nhắn lỗi hiển thị tiếng Việt, ví dụ "Chatbox đang tắt" hoặc "Không thể kết nối AI, vui lòng thử lại sau".
+- Câu trả lời có thể kèm nút/link điều hướng nội bộ khi liên quan.
+- Mobile: panel chiếm gần toàn màn hình, không che nút submit chính của các form khi đóng.
+
+**API đề xuất:**
+- `GET /api/config/features` bổ sung `{ chatboxEnabled: boolean }`.
+- `GET /api/chat/messages` → lấy lịch sử gần nhất của user hiện tại (giới hạn 30 tin).
+- `POST /api/chat` → nhận `{ message: string }`, trả `{ answer: string, links?: { label: string, href: string }[] }`.
+- `DELETE /api/chat/messages` → xoá lịch sử chat của user hiện tại.
+- Tất cả API check session; nếu `CHATBOX_ENABLED=false` trả 403; nếu Gemini lỗi trả 502 + thông báo tiếng Việt.
+
+**Kỹ thuật:**
+- Dùng `@google/genai` và `GEMINI_MODEL` như phần AI import; model mặc định `gemini-3.5-flash`.
+- Tạo lớp service `lib/chat-assistant.ts` để dựng system prompt, phân loại intent, gọi các helper đọc dữ liệu đã kiểm soát quyền, sau đó mới gọi Gemini.
+- Lưu `ChatMessage` để hỗ trợ ngữ cảnh ngắn hạn; giới hạn tối đa 30 tin/user trong prompt để tránh chi phí cao.
+- Ghi audit log metadata cho mỗi lượt gọi `action = CHATBOX_ASK`, gồm `{ messageLength, usedDataScope, model }`; không log nguyên văn câu hỏi/câu trả lời vào audit log.
+
 ---
 
 ## 6. Quy tắc nghiệp vụ
@@ -658,6 +730,14 @@ function classifyScore(score: number, studentStatus: StudentStatus): Classificat
 - Điểm: integer 0-100.
 - Mỗi SV chỉ có 1 record điểm cho 1 HK.
 
+### 6.6. Quy tắc Chatbox
+
+- Chatbox chỉ được đọc dữ liệu qua các helper/service đã áp dụng quyền theo vai trò; không query Prisma trực tiếp từ prompt hoặc client.
+- Chatbox không được thực hiện mutation. Nếu người dùng yêu cầu "hãy sửa điểm", "xoá sinh viên", "tạo lớp" → trả lời bằng hướng dẫn và link tới màn hình phù hợp.
+- Câu trả lời liên quan điểm/xếp loại phải dùng cùng hàm tính xếp loại ở mục 6.1; không lấy xếp loại do AI tự suy luận.
+- Nếu câu hỏi mơ hồ về phạm vi thời gian/lớp/học kỳ, Chatbox hỏi lại ngắn gọn hoặc gợi ý người dùng chọn bộ lọc trên màn hình.
+- Lịch sử chat là dữ liệu cá nhân của từng user; user chỉ xem/xoá lịch sử của chính mình, Admin không xem nội dung hội thoại mặc định.
+
 ---
 
 ## 7. Đặc tả Import/Export Excel chi tiết
@@ -695,6 +775,7 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 
 - **Sidebar trái** (thu gọn được): Dashboard, Sinh viên, Điểm rèn luyện, Tra cứu, Thống kê, Quản lý danh mục (chỉ Admin), Audit log, Tài khoản.
 - **Topbar**: tên app, thanh tìm kiếm global, badge tên người dùng + dropdown logout.
+- **Chatbox**: floating button góc phải dưới, chỉ hiện khi `CHATBOX_ENABLED=true`.
 - Theme sáng/tối (light/dark toggle).
 - Font: `Inter` cho UI, `Times New Roman` chỉ dùng trong file Excel export.
 
@@ -710,6 +791,7 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 8. **Thống kê** — chọn phạm vi (lớp/khoa) + loại biểu đồ.
 9. **Audit log** — table có filter ngày, user, action.
 10. **Quản lý danh mục** — tabs cho từng entity.
+11. **Chatbox** — panel hỏi đáp nhanh, truy cập được từ các màn hình sau khi đăng nhập.
 
 ### 8.3. Yêu cầu UX
 
@@ -725,6 +807,7 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 
 - **Hiệu năng**: load danh sách 200 SV < 500ms. Import file 200 dòng < 3s.
 - **Bảo mật**: hash password, CSRF protection (Next.js mặc định), validate input ở cả client + server (Zod).
+- **AI/Chatbox**: timeout mỗi request AI tối đa 30s; giới hạn input chat 1.000 ký tự/lượt; không đưa secret hoặc dữ liệu ngoài quyền vào prompt.
 - **Backup**: nút "Sao lưu DB" trong Admin → tạo file `backup-YYYYMMDD-HHmm.db` ở thư mục `./backups`.
 - **Khởi chạy**: `npm install && npm run db:migrate && npm run db:seed && npm run dev` chạy được trên Windows/macOS/Linux.
 
@@ -743,11 +826,12 @@ File `DC22CTT01-II-25-26.xls`, gồm 7 sheet:
 | Auth | next-auth v5 (Credentials) |
 | Excel I/O | exceljs (đọc/ghi `.xlsx`), `xlsx` (fallback cho `.xls` cũ) |
 | AI nhận diện import | `@google/genai` (Google Gemini) — model mặc định `gemini-3.5-flash`, cấu hình qua `GEMINI_MODEL`; dùng Structured Output (`responseMimeType: application/json` + `responseSchema`) |
+| Chatbox AI | `@google/genai` dùng chung `GEMINI_API_KEY`/`GEMINI_MODEL`; service server-side kiểm soát context và quyền truy cập |
 | Charts | recharts |
 | Bcrypt | bcryptjs |
 | Notification | sonner |
 | Testing | vitest + playwright (smoke test) |
-| Feature flag | biến môi trường `.env` (`IMPORT_EXCEL_ENABLED`, `AI_IMPORT_ENABLED`) |
+| Feature flag | biến môi trường `.env` (`IMPORT_EXCEL_ENABLED`, `AI_IMPORT_ENABLED`, `CHATBOX_ENABLED`) |
 
 ---
 
@@ -782,6 +866,7 @@ diem-renluyen/
 │   │   │   ├── scores/
 │   │   │   ├── import/excel/    # đứng sau feature flag
 │   │   │   ├── export/excel/
+│   │   │   ├── chat/            # chatbox trợ lý, đứng sau feature flag
 │   │   │   ├── config/features/
 │   │   │   └── stats/
 │   │   ├── layout.tsx
@@ -794,6 +879,7 @@ diem-renluyen/
 │   ├── lib/
 │   │   ├── auth.ts
 │   │   ├── db.ts
+│   │   ├── chat-assistant.ts
 │   │   ├── classification.ts
 │   │   ├── excel-import.ts
 │   │   ├── excel-export.ts
@@ -829,6 +915,10 @@ IMPORT_EXCEL_ENABLED=false
 AI_IMPORT_ENABLED=false
 GEMINI_API_KEY=""
 GEMINI_MODEL="gemini-3.5-flash"   # có thể đổi sang model mạnh hơn
+
+# Chatbox trợ lý trong hệ thống (mục 5.11) — mặc định OFF
+# Bật = gửi câu hỏi và context tối thiểu tới Google Gemini API
+CHATBOX_ENABLED=false
 ```
 
 ---
@@ -843,6 +933,9 @@ PRD được coi là hoàn thành khi:
 - [ ] Khi flag bật: import *Bảng tổng hợp điểm HK theo lớp* vào đúng Lớp/HK/Năm học đã chọn; preview hiển thị dòng "sẽ ghi đè" khi SV đã có điểm; xếp loại được recompute server-side, không lấy từ cột Excel.
 - [ ] Khi `AI_IMPORT_ENABLED=false` (hoặc thiếu `GEMINI_API_KEY`): nút "Phân tích bằng AI" ẨN; gọi trực tiếp `/api/import/excel/ai-analyze` trả **403**; import vẫn chạy được bằng parser tất định.
 - [ ] Khi `AI_IMPORT_ENABLED=true`: với file đổi tên cột/sheet, AI đề xuất ánh xạ cột + gắn cờ dòng nghi ngờ (điểm có ký tự lạ, MSSV sai regex); CVHT duyệt trước khi commit; xếp loại vẫn recompute server-side (không lấy từ AI); có cảnh báo quyền riêng tư trước lần chạy đầu và audit log `AI_ANALYZE_IMPORT`.
+- [ ] Khi `CHATBOX_ENABLED=false`: nút Chatbox ẨN; gọi trực tiếp `/api/chat` trả **403**.
+- [ ] Khi `CHATBOX_ENABLED=true`: người dùng đăng nhập thấy floating chatbox; hỏi hướng dẫn nhập điểm/import/export nhận câu trả lời tiếng Việt có link điều hướng phù hợp.
+- [ ] Chatbox chỉ trả lời dữ liệu trong phạm vi quyền: CVHT không hỏi được dữ liệu lớp khác; Trưởng khoa chỉ xem tổng hợp khoa mình; yêu cầu sửa/xóa/tạo dữ liệu qua chat bị từ chối và chuyển thành hướng dẫn thao tác.
 - [ ] CVHT đăng nhập, thấy đúng lớp được gán, không thấy lớp khác.
 - [ ] Chạy `npm run seed:excel -- --file=./sample/DC22CTT01-II-25-26.xls` thành công → 14 SV + điểm các HK đã trong DB.
 - [ ] CVHT thêm 1 điểm mới qua Mode A (Dialog) → xếp loại auto đúng.
@@ -867,7 +960,7 @@ PRD được coi là hoàn thành khi:
 | 2 | CRUD danh mục (Khoa/Khóa/Lớp/SV/HK/Năm học/User) |
 | 3 | Logic xếp loại + Nhập điểm Mode A (Dialog) + Mode B (inline) + CLI seed Excel + Audit log |
 | 4 | Export Excel theo mẫu (4 loại) + Import Excel (sau feature flag) + AI nhận diện file import (mục 5.5.2, sau flag `AI_IMPORT_ENABLED`) |
-| 5 | Tra cứu + Thống kê + Biểu đồ |
+| 5 | Tra cứu + Thống kê + Biểu đồ + Chatbox trợ lý (sau flag `CHATBOX_ENABLED`) |
 | 6 | Polish UX, Backup, Test E2E, viết README |
 
 ---
@@ -878,12 +971,15 @@ PRD được coi là hoàn thành khi:
 
 ```
 Tôi muốn xây dựng ứng dụng "Quản lý Điểm Rèn luyện Sinh viên" theo PRD trong
-file PRD-DiemRenLuyen.md (v1.2).
+file PRD-DiemRenLuyen.md (v1.9).
 
-Lưu ý đặc biệt v1.2:
+Lưu ý đặc biệt v1.9:
 - Tính năng "Nhập điểm thủ công" có 2 mode (Dialog + Inline editable) - làm cả 2.
 - Tính năng "Import Excel" implement đầy đủ NHƯNG đứng sau feature flag
   IMPORT_EXCEL_ENABLED (mặc định = false → ẩn nút UI + API trả 403).
+- Tính năng "Chatbox trợ lý" implement sau feature flag CHATBOX_ENABLED
+  (mặc định = false → ẩn nút UI + API trả 403), chỉ hỗ trợ hỏi đáp/read-only,
+  không tự ghi dữ liệu vào DB.
 
 Bắt đầu giúp tôi từ Tuần 1 trong Roadmap (mục 13). Confirm hiểu yêu cầu rồi bắt đầu.
 ```

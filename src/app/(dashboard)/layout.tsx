@@ -5,6 +5,7 @@ import type { Role } from "@/lib/enums";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { CommandPalette } from "@/components/command-palette";
+import { ChatWidget } from "@/components/chat/chat-widget";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 export default async function DashboardLayout({
@@ -26,6 +27,7 @@ export default async function DashboardLayout({
         <div className="flex-1 animate-fade-up p-4 md:p-6">{children}</div>
       </SidebarInset>
       <CommandPalette />
+      <ChatWidget />
     </SidebarProvider>
   );
 }

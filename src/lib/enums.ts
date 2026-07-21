@@ -18,6 +18,16 @@ export const Role = {
 export type Role = (typeof Role)[keyof typeof Role];
 export const RoleSchema = z.enum(["ADMIN", "CVHT", "TRUONG_KHOA"]);
 
+// ──────────────────────────── ChatRole ───────────────────────────
+// Vai trò của một tin nhắn trong hội thoại Chatbox (mục 5.11).
+export const ChatRole = {
+  USER: "USER",
+  ASSISTANT: "ASSISTANT",
+  SYSTEM: "SYSTEM",
+} as const;
+export type ChatRole = (typeof ChatRole)[keyof typeof ChatRole];
+export const ChatRoleSchema = z.enum(["USER", "ASSISTANT", "SYSTEM"]);
+
 // ──────────────────────────── Gender ────────────────────────────
 export const Gender = {
   MALE: "MALE",

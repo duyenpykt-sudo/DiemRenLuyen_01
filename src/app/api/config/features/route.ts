@@ -15,5 +15,6 @@ export async function GET() {
   return apiOk({
     importExcelEnabled: features.importExcel,
     aiImportEnabled: features.aiImport,
+    chatboxEnabled: features.chatbox,
   });
 }

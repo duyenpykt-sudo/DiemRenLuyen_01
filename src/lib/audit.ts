@@ -11,7 +11,8 @@ export type AuditAction =
   | "IMPORT_CREATE"
   | "IMPORT_UPDATE"
   | "AI_ANALYZE_IMPORT"
-  | "AI_ANALYZE_IMPORT_STUDENTS";
+  | "AI_ANALYZE_IMPORT_STUDENTS"
+  | "CHATBOX_ASK";
 
 interface WriteAuditParams {
   userId: string;

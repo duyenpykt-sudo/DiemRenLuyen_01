@@ -26,6 +26,7 @@ model User {
   isActive     Boolean   @default(true)
   advisedClasses Class[] @relation("ClassAdvisor")
   auditLogs    AuditLog[]
+  chatMessages ChatMessage[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -140,4 +141,20 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@index([entityType, entityId])
+}
+
+// Lịch sử hội thoại Chatbox trợ lý (mục 5.11 PRD). Dữ liệu cá nhân của từng
+// user; chỉ chủ sở hữu xem/xoá. role lưu String theo quy ước enum của schema
+// (validate qua ChatRoleSchema trong src/lib/enums.ts). metadata là JSON chuỗi
+// (vd links kèm câu trả lời) — không chứa dữ liệu nhạy cảm.
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String // ChatRole: 'USER' | 'ASSISTANT' | 'SYSTEM'
+  content   String
+  metadata  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

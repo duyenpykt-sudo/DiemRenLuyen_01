@@ -14,4 +14,10 @@ export const features = {
   aiImport:
     process.env.AI_IMPORT_ENABLED === "true" &&
     !!process.env.GEMINI_API_KEY?.trim(),
+
+  // Bật/tắt Chatbox trợ lý (mục 5.11). Chỉ bật khi flag = true VÀ có
+  // GEMINI_API_KEY. false → ẩn floating button + API /api/chat trả 403.
+  chatbox:
+    process.env.CHATBOX_ENABLED === "true" &&
+    !!process.env.GEMINI_API_KEY?.trim(),
 };
